@@ -1,15 +1,16 @@
 import pygame
 from pygame.locals import *
-from shader import Shader, vertex, fragment, Uniform, hw_flip, Texture
+
+from shader import Shader, fragment, Uniform, hw_flip, Texture
 import GLSL_helpers as g
+
 
 class MyShader(Shader):
     def __init__(self, t):
         Shader.__init__(self, t)
-        self.time: Uniform[float] = Uniform(float)
-        self.zoom: Uniform[float] = Uniform(float)
+        self.time = Uniform(float)
+        self.zoom = Uniform(float)
         self.zoom_pos = Uniform(g.vec2)
-        self.iResolution = Uniform(g.vec3)
 
     @fragment
     def distance(self, c: g.vec2) -> float:
@@ -37,34 +38,39 @@ class MyShader(Shader):
         return d
 
     @fragment
-    def main(self):
+    def main(self):  # this function is called for for each pixel and run on the gpu
         p: g.vec2 = self.fragCoord
-        c: g.vec2 = self.zoom_pos + p*self.zoom
+        c: g.vec2 = self.zoom_pos + p * self.zoom
         d: float = self.distance(c)
         d = g.clamp(g.pow(4.0*d/self.zoom, 0.2), 0.0, 1.0)
         col: g.vec3 = g.vec3(d)
         gl_FragColor = g.vec4(col, 1.0)
 
 def main():
+    # pygame stuff
     pygame.init()
     window = pygame.display.set_mode((640, 480), HWSURFACE | OPENGL | DOUBLEBUF)
+    pygame.display.set_caption("simple 100% pure python gpu shader")
+    clock = pygame.time.Clock()
+    running = True
+    # make shader object
     output = Texture(window)
     my_shader = MyShader(output)
     my_shader.compile()
-    clock = pygame.time.Clock()
-    running = True
+    # set up variables for controlling the zoom and drag to move
     z = 80  # the zoom level
     scroll_speed = 80
     pos = pygame.Vector2(0, 0)
-    rel = (0, 0)  # distance the mouse moved while held
+    rel = (0, 0)  # distance the mouse moved while the mouse button is down
     start = None
-    zoo = pow(0.5, 32.0 * (0.5 - 0.5 * (z / scroll_speed))) # normalize zoom
+    zoo = pow(0.5, 32.0 * (0.5 - 0.5 * (z / scroll_speed)))  # normalized zoom
     my_shader.zoom = zoo
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     start = pygame.mouse.get_pos()
                 if event.button == 5:
@@ -72,7 +78,8 @@ def main():
                 elif event.button == 4:
                     z = max(0, z-1)  # cap the zoom level
                 my_shader.zoom = zoo
-            if event.type == pygame.MOUSEBUTTONUP:
+
+            elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     pos.x += rel[0]
                     pos.y += rel[1]
@@ -90,9 +97,11 @@ def main():
         my_shader.zoom_pos = pos.x+rel[0], pos.y+rel[1]  # +rel for update position mid drag
         my_shader.render()
         window.blit(output.get_surface(), (0, 0))
-        hw_flip()
+        hw_flip()  # pygame dose not like "HWSURFACE | OPENGL" but its required for shader
+        # so we need to call this so we can use a shader and all the normal pygame stuff
         pygame.display.flip()
         clock.tick(60)
+
     pygame.quit()
 
 
