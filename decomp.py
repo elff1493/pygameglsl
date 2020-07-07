@@ -14,12 +14,12 @@ v = """
 
 attribute vec2 vPosition;
 attribute vec2 vTexcoords;
-varying vec2 fTexcoords;
+varying vec2 fragCoord;
 
 void main()
 {
     gl_Position = vec4(vPosition.x, vPosition.y, 0.0, 1.0);
-    fTexcoords = vTexcoords;
+    fragCoord = vTexcoords;
 }
 """
 f = """
@@ -29,6 +29,7 @@ varying vec2 fTexcoords;
 uniform sampler2D textureObj;
 uniform vec3 iResolution;
 uniform float iTime;
+
 
 #define param 0.63
 
@@ -81,13 +82,11 @@ def str_node(node):
 class Ops:
     def __init__(self, _globals):
         self.globals = _globals
+        self.atterl_remove = ["self"]
 
     def Attribute(self, node):
-        if node.value.__class__.__name__ == "Name" :
-            if self.globals.get(node.value.id, None) == _gl:
-                return node.attr
         name = self.call(node.value)
-        if name == "self": # the "self" can be called something else
+        if name in self.atterl_remove:
             return node.attr
         return name + "." + node.attr
 
@@ -186,7 +185,7 @@ class Ops:
         body_else = ""
         if node.orelse:
             body_else = " else {\n%s} " % self.re_body(node.orelse)
-        return "if (%s)\n{\n %s}\n%s" % (name, body, body_else)  # todo add else
+        return "if (%s)\n{\n %s}%s" % (name, body, body_else)  # todo add else
 
     def Expr(self, node):
         return self.re_expression(node)
@@ -210,7 +209,23 @@ class Ops:
         f = f"for ({t} {name}={start};i<{end};{name}+={step}){{\n{body}\n}}"
         return f
 
+    def UnaryOp(self, node):
+        return self.call(node.op) + self.call(node.operand)
+
+    def USub(self, node):
+        return "-"
+
+    def Lt(self, node):
+        return "<"
+    def Gt(self, node):
+        return ">"
+    def Break(self, node):
+        return "break"
     calls = {
+        "Break": Break,
+        "Gt": Gt,
+        "UnaryOp": UnaryOp,
+        "USub": USub,
         "Constant": Constant,
         "Add": Add,
         "Assign": Assign,
@@ -230,7 +245,8 @@ class Ops:
         "For": For,
         "Sub": Sub,
         "Attribute": Attribute,
-        "Return": Return
+        "Return": Return,
+        "Lt": Lt
 
     }
 
@@ -247,6 +263,7 @@ class Recompiler:
         self.debug = False
         self.globals = {}
         self.uniforms = []
+        self.import_as = ""
         # self.code = get_code(data.__code__) # todo replace with inspects get sorce
         # self.ast = ast.parse(self.code, type_comments=True)
 
@@ -258,6 +275,7 @@ class Recompiler:
         # print(formate)
         node = ast.parse(formate, type_comments=True)
         op = Ops(self.globals)
+        op.atterl_remove.append(self.import_as)
         out = op.call(node)
 
         t = f.__annotations__
@@ -286,8 +304,15 @@ class Recompiler:
         for i in self.functions:
             i.glsl = self.comp_func(i.callback)
         self.vertex = v
-        self.fragment = f % "".join([i.glsl + "\n" for i in self.functions])
-        #print(self.fragment)
+        out = "#version 120\n"
+        out += "precision highp float;\n"
+        out += "varying vec2 fragCoord;\n"
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
+        #print(self.uniforms)
+        func = "".join([i.glsl + "\n" for i in self.functions])
+        out += func
+        self.fragment = out
+        #print(out)
 
     def _debug_tree(self, node, level=0):
 

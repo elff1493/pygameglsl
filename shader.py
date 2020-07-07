@@ -5,6 +5,7 @@ import numpy
 from typing import get_type_hints, TypeVar, Generic
 from decomp import Recompiler
 import GLSL_helpers as _gl
+import sys
 FRAG_BACE = """
 #version 120
 
@@ -25,7 +26,7 @@ def arg_part(f, n):
     return gl_skip_mid
 
 
-all_types = TypeVar("all_types", int, float, _gl.sampler2D)
+
 
 
 class Attribute:...  # todo
@@ -37,8 +38,8 @@ class Constant:  # todo
         self.type = _type
         self.name = ""
 
-
-class Uniform(Generic[all_types]):
+T = TypeVar("T", _gl.all_types, int)
+class Uniform(Generic[T]):
     def __init__(self, _type, value=None, set=True, get=True): # think of better name that dosnt shadow biltin or in
         self.value = value
         self.type = _type
@@ -138,6 +139,7 @@ class Shader:
     __uniform_types_set = {int:glUniform1i,
                            float:glUniform1f,
                            _gl.sampler2D:glUniform1i,
+                           _gl.vec2:arg_part(glUniform2fv, 1),
                            _gl.vec3:arg_part(glUniform3fv, 1)
                            } # todo compleat types
     __uniform_types_get = {} # todo add
@@ -150,7 +152,7 @@ class Shader:
         self.glsl_vertex = ""
         self.glsl_funtions = []  # [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
         self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
-        self.__comp.debug = True
+        #self.__comp.debug = True
         self._fb_obj = None
         self.program = None
         self.__uniform_name = {}
@@ -214,7 +216,12 @@ class Shader:
         self.glsl_funtions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
         self.__comp.functions = self.glsl_funtions
         self.__comp.uniforms = u
-        self.__comp.globals = globals()
+        m = sys.modules[self.__module__]
+        for i in dir(m):
+            if getattr(m, i) == _gl:
+                self.__comp.import_as = i
+                break
+        #self.__comp.globals = globals()
         self.__comp.run()
 
         self.glsl_fragment = self.__comp.fragment
@@ -249,7 +256,6 @@ class Shader:
         for v, t, n in u:
             self.__uniform_name[n] = glGetUniformLocation(self.program, n)
             setattr(self.__class__, n, self.f_gen(n, t))
-        print(self.__uniform_name)
 
         vertices = [-1, -1,
                     -1, 1,

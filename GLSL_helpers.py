@@ -1,9 +1,14 @@
-from typing import TypeVar
+from typing import TypeVar, Union
 
 class vec2:  # todo i think you can make it from one arg?
-    def __init__(self, x:float, y:float):...
+    def __init__(self, x:float, y:float):
+        self.x: float = x
+        self.y: float = y
+        self.h: vec2
     def __truediv__(self, other):...
     def __abs__(self):...
+    def __add__(self, other):...
+    def __rmul__(self, other) -> "vec2":return self
 class vec3:
     def __init__(self, x:float, y:float, z:float):...
 class vec4:
@@ -33,13 +38,14 @@ class samplerCube:...
 class void:...
 
 class struct:...
-class GenType:...
 
-mat = TypeVar("mat", mat2, mat3, mat4)
-vec = TypeVar("vec", vec2, vec3, vec4)
-ivec = TypeVar("ivec", ivec2, ivec3, ivec4)
-bvec = TypeVar("bvec", bvec2, bvec3, bvec4)
-GenType = TypeVar("GenType", int, float)#, *ivec, vec) # mat to? # todo
+
+mat = Union[mat2, mat3, mat4]
+vec = Union[vec2, vec3, vec4]
+ivec = Union[ivec2, ivec3, ivec4]
+bvec = Union[bvec2, bvec3, bvec4]
+GenType = Union[int, float, vec, ivec]# mat to? # todo
+all_types = Union[GenType, vec, bvec, mat, sampler1D, sampler2D] #todo add all
 
 # trig
 def radians(degrees: GenType) -> GenType:...
@@ -166,7 +172,7 @@ def noise2(x: GenType) -> vec2:...
 def noise3(x: GenType) -> vec3:...
 def noise4(x: GenType) -> vec4:...
 
-# frag biltins
+# frags biltins
 gl_FragCoord: vec2
 gl_FrontFacing: bool
 gl_FragColor: vec4
