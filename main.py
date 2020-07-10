@@ -17,12 +17,63 @@ class MyShader(Shader):
         self.iResolution = Uniform(g.vec3)
 
     @fragment
+    def test(self) -> None:
+        a = 1 + self
+        if 1 or 2 and 3:
+            a = 1
+        a[1] = 1
+        #ass list
+        #ass name?
+        #ass typle
+        assert 1==1
+        #assing
+        a: int = 1
+        #backquote
+        a = a & 1
+        a = a | 1
+        a = a ^ 1
+        a = call()
+        #class
+        a = 1==4
+        a = 5
+        #decorator
+        a = {}
+        # elipsis/ sliceing
+        # Expression
+        # Exec
+        # FloorDiv
+        for i in range(5):
+            if i:
+                break
+            continue
+        def f():
+            return 1
+        a = a.atter
+        global aa
+        if 1:
+            a = 1
+        a = not a
+        # keyword
+        # Lambda
+        # LeftShift
+        # List
+        # ListComp
+        # ListCompFor
+        # ListCompIf
+        # Mod
+        a = a % 3
+        a = a * 1
+        a = not a
+        a = a ** a
+
+
+    @fragment
     def get_p(self, p:g.vec2) -> g.vec2:
         return abs(p) / g.dot(p, p) - 0.63
 
     @fragment
     def main(self):
-        p: g.vec2 = 2. * self.fTexcoords
+        p: g.vec2 = 2. * self.fragCoord
         p *= 4
         p = g.mod(p, 4.0) - 2.0
 
@@ -32,7 +83,7 @@ class MyShader(Shader):
         p = p / 2.0
         de: float = abs(g.dot(p, g.vec2(g.cos(self.iTime), g.sin(self.iTime))))
         gl_FragColor = g.vec4(g.vec3(de), 1.0)
-        gl_FragColor = g.texture2D(self.textureObj, self.fTexcoords)
+        gl_FragColor = g.texture2D(self.textureObj, self.fragCoord)
         gl_FragColor.r = (g.sin(self.iTime)+1)/2
 
 class T:

@@ -8,7 +8,6 @@ import GLSL_helpers as g
 class MyShader(Shader):
     def __init__(self, t):
         Shader.__init__(self, t)
-        self.time = Uniform(float)
         self.zoom = Uniform(float)
         self.zoom_pos = Uniform(g.vec2)
 
@@ -93,11 +92,10 @@ def main():
             rel = rel[0] / (window.get_size()[0] / 2), rel[1] / (window.get_size()[1] / -2)
             rel = (rel[0] * zoo, rel[1] * zoo)
 
-        my_shader.time = pygame.time.get_ticks()/1000
         my_shader.zoom_pos = pos.x+rel[0], pos.y+rel[1]  # +rel for update position mid drag
         my_shader.render()
         window.blit(output.get_surface(), (0, 0))
-        hw_flip()  # pygame dose not like "HWSURFACE | OPENGL" but its required for shader
+        hw_flip()  # pygame doesnt not like "HWSURFACE | OPENGL" but its required for shader
         # so we need to call this so we can use a shader and all the normal pygame stuff
         pygame.display.flip()
         clock.tick(60)

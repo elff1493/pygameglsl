@@ -83,6 +83,7 @@ class Ops:
     def __init__(self, _globals):
         self.globals = _globals
         self.atterl_remove = ["self"]
+        self.errors = []
 
     def Attribute(self, node):
         name = self.call(node.value)
@@ -155,13 +156,20 @@ class Ops:
     def call(self, node):
         if node.__class__.__name__ in Ops.calls:
             return Ops.calls[node.__class__.__name__](self, node)
-        return node.__class__.__name__
+        raise TypeError(str(node.__class__.__name__))
+        #return node.__class__.__name__
 
     def Store(self, node):
         return ""
 
     def BinOp(self, node):
-        return self.re_expression(node)
+        if node.op.__class__.__name__ == "Mod":
+            return "mod(%s, %s)" % (self.call(node.left), self.call(node.right))
+        elif node.op.__class__.__name__ == "Pow":
+            return "pow(%s, %s)" % (self.call(node.left), self.call(node.right))
+        return self.call(node.left) \
+               + self.call(node.op) \
+               + self.call(node.right)
 
     def Load(self, node):
         return ""
@@ -180,7 +188,7 @@ class Ops:
 
     def If(self, node):
         out = ""
-        name = self.re_expression(node.test)
+        name = self.call(node.test)
         body = self.re_body(node).replace("\n", "\n ")
         body_else = ""
         if node.orelse:
@@ -217,13 +225,117 @@ class Ops:
 
     def Lt(self, node):
         return "<"
+
     def Gt(self, node):
         return ">"
+
     def Break(self, node):
         return "break"
+
+    def Or(self, node):
+        return " || "  # logical or
+
+    def And(self, node):
+        return " && "
+
+    def BoolOp(self, node): # todo test
+        op = self.call(node.op)
+        #return "this one"
+        return self.call(node.values[0]) + op + self.call(node.values[1])
+        return op.join([self.call(i) for i in node.values])
+
+    def Subscript(self, node):
+        return self.call(node.value) + "[" + self.call(node.slice) + "]"
+
+    def Index(self, node):
+        return self.call(node.value)
+
+    def Assert(self, node):
+        self.errors.append("assert not supported")
+        return ""
+
+    def BitAnd(self, node):
+        return " & "
+
+    def BitOr(self, node):
+        return " | "
+
+    def BitXor(self, node):
+        return " ^ "
+
+    def Compare(self, node):
+        return self.call(node.left) \
+               + ("".join([self.call(op) + " " + self.call(comp) for op, comp in zip(node.ops, node.comparators)]))
+
+    def Eq(self, node):
+        return " == "
+
+    def NotEq(self, node):
+        return " != "
+
+    def LtE(self, node):
+        return " <= "
+
+    def GtE(self, node):
+        return " >= "
+
+    def Is(self, node):
+        self.errors.append("is is not supported, defulted to ==")
+        return " == "
+
+    def IsNot(self, node):
+        self.errors.append("is not is not supported, defulted to !=")
+        return " == "
+
+    def In(self, node):
+        self.errors.append("In is not supported")
+        return ""
+
+    def In(self, node):
+        self.errors.append("In is not supported")
+        return ""
+
+    def NotIn(self, node):
+        self.errors.append("not in is not supported")
+        return ""
+
+    def Dict(self, node):
+        self.errors.append("dictionaries are not supported")
+        return ""
+
+    def Continue(self, node):
+        return "continue"
+
+    def FunctionDef(self, node):
+        self.errors.append("nested functions are not supported")
+        return ""
+
+    def Global(self, node):
+        self.errors.append("globals are not supported yet")  # todo look in to global geter
+        return ""
+
+    def Not(self, node):  # todo test if works
+        return "!"
+
     calls = {
+
+        "Not": Not,
+        "Global": Global,
+        "FunctionDef": FunctionDef,
+        "Continue":Continue,
+        "Dict": Dict,
+        "Compare":Compare,
+        "BitXor": BitXor,
+        "BitOr": BitOr,
+        "BitAnd": BitAnd,
+        "Assert": Assert,
+        "Index": Index,
+        "Subscript": Subscript,
+        "And": And,
+        "BoolOp": BoolOp,
+        "Or": Or,
         "Break": Break,
-        "Gt": Gt,
+
         "UnaryOp": UnaryOp,
         "USub": USub,
         "Constant": Constant,
@@ -246,8 +358,18 @@ class Ops:
         "Sub": Sub,
         "Attribute": Attribute,
         "Return": Return,
-        "Lt": Lt
 
+
+        "Eq": Eq,
+        "NotEq": NotEq,
+        "Lt": Lt,
+        "LtE": LtE,
+        "Gt": Gt,
+        "GtE": GtE,
+        "Is": Is,
+        "IsNot": IsNot,
+        "In": In,
+        "NotIn": NotIn,
     }
 
 owo2 = "owo\n\n\n\n\nowo"
@@ -277,7 +399,8 @@ class Recompiler:
         op = Ops(self.globals)
         op.atterl_remove.append(self.import_as)
         out = op.call(node)
-
+        if op.errors:
+            raise Exception("\n".join(op.errors))
         t = f.__annotations__
         _type = t.get("return", None)
         if _type == None:

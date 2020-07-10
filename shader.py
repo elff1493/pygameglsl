@@ -152,7 +152,7 @@ class Shader:
         self.glsl_vertex = ""
         self.glsl_funtions = []  # [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
         self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
-        #self.__comp.debug = True
+        self.__comp.debug = True
         self._fb_obj = None
         self.program = None
         self.__uniform_name = {}
