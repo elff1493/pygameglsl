@@ -1,14 +1,13 @@
 from typing import TypeVar, Union
 
-class vec2:  # todo i think you can make it from one arg?
-    def __init__(self, x:float, y:float):
+class vec2:
+    def __init__(self, x: float, y: float="x"):
         self.x: float = x
         self.y: float = y
-        self.h: vec2
     def __truediv__(self, other):...
     def __abs__(self):...
     def __add__(self, other):...
-    def __rmul__(self, other) -> "vec2":return self
+    def __rmul__(self, other) -> "vec2":...
 class vec3:
     def __init__(self, x:float, y:float, z:float):...
 class vec4:

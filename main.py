@@ -1,12 +1,8 @@
-from OpenGL.GL import *
-from OpenGL.GL.shaders import *
-
 import pygame
 from pygame.locals import *
-import numpy, time, sys
-from shader import Shader, vertex, fragment, Uniform, hw_flip, Texture
-from GLSL_helpers import sampler2D
-import GLSL_helpers as g
+from shader import Shader, fragment, Uniform, hw_flip, Texture
+from glsl.v1_10 import sampler2D
+from glsl import v1_10 as g
 
 
 class MyShader(Shader):
@@ -25,7 +21,7 @@ class MyShader(Shader):
         #ass list
         #ass name?
         #ass typle
-        assert 1==1
+        assert 1 == 1
         #assing
         a: int = 1
         #backquote
@@ -86,9 +82,6 @@ class MyShader(Shader):
         gl_FragColor = g.texture2D(self.textureObj, self.fragCoord)
         gl_FragColor.r = (g.sin(self.iTime)+1)/2
 
-class T:
-    def __init__(self, t):
-        self.tex = t
 def main():
     pygame.init()
     window = pygame.display.set_mode((640, 480), HWSURFACE | OPENGL | DOUBLEBUF)

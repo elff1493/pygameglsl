@@ -2,7 +2,7 @@ import pygame
 from pygame.locals import *
 
 from shader import Shader, fragment, Uniform, hw_flip, Texture
-import GLSL_helpers as g
+import glsl as g
 
 
 class MyShader(Shader):

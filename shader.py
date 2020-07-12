@@ -2,31 +2,17 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import pygame
 import numpy
-from typing import get_type_hints, TypeVar, Generic
+from typing import TypeVar, Generic
 from decomp import Recompiler
-import GLSL_helpers as _gl
+from glsl import v1_10 as _gl
+import glsl as _glsl
 import sys
-FRAG_BACE = """
-#version 120
 
-varying vec2 fTexcoords;
-uniform sampler2D textureObj;
-{uniforms}
-
-void main()
-{
-{code}
-}
-{funtions}
-"""
 
 def arg_part(f, n):
     def gl_skip_mid(name, value):
         f(name, n, value)
     return gl_skip_mid
-
-
-
 
 
 class Attribute:...  # todo
@@ -40,7 +26,7 @@ class Constant:  # todo
 
 T = TypeVar("T", _gl.all_types, int)
 class Uniform(Generic[T]):
-    def __init__(self, _type, value=None, set=True, get=True): # think of better name that dosnt shadow biltin or in
+    def __init__(self, _type, value=None, set=True, get=True):  # think of better name that dosnt shadow biltin or in
         self.value = value
         self.type = _type
         self.name = ""
@@ -151,8 +137,8 @@ class Shader:
         self.glsl_fragment = ""
         self.glsl_vertex = ""
         self.glsl_funtions = []  # [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
-        self.__comp.debug = True
+        #self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
+        #self.__comp.debug = True
         self._fb_obj = None
         self.program = None
         self.__uniform_name = {}
@@ -201,31 +187,31 @@ class Shader:
     def _uniform_bach(self):
         pass
 
+    def compile_from_file(self, fragment_path, vertex_path):
+        pass
+
     def compile(self):
         """compile the shader for use and create atrabute seter and getters"""
-        if hasattr(self.__class__, "is_compiled"):
-            if self.is_compiled:
-                return
-        self.__class__.is_compiled = True
-        self.__class__.__fragment = ""
-        self.__class__.__vertex = ""
         uo = [getattr(self, i)(i) for i in dir(self) if isinstance(getattr(self, i), Uniform)]
+        ao = [getattr(self, i)(i) for i in dir(self) if isinstance(getattr(self, i), Attribute)]
         u = [(j.value, j.type, j.name) for j in
              uo]
 
-        self.glsl_funtions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        self.__comp.functions = self.glsl_funtions
-        self.__comp.uniforms = u
+        glsl_funtions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
+
+        compiler = Recompiler([])
+        compiler.functions = glsl_funtions
+        compiler.uniforms = u
         m = sys.modules[self.__module__]
         for i in dir(m):
-            if getattr(m, i) == _gl:
-                self.__comp.import_as = i
+            if getattr(m, i) in (_gl, _glsl):
+                compiler.import_as = i
                 break
-        #self.__comp.globals = globals()
-        self.__comp.run()
 
-        self.glsl_fragment = self.__comp.fragment
-        self.glsl_vertex = self.__comp.vertex
+        compiler.run()
+
+        self.glsl_fragment = compiler.fragment
+        self.glsl_vertex = compiler.vertex
 
         vertexShader = compileShader(self.glsl_vertex, GL_VERTEX_SHADER)
         fragmentShader = compileShader(self.glsl_fragment, GL_FRAGMENT_SHADER)
@@ -242,11 +228,11 @@ class Shader:
 
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
         if status != GL_FRAMEBUFFER_COMPLETE:
-            print("incomplete framebuffer object")
+            raise Exception("frame buffer error - incomplete")
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glBindTexture(GL_TEXTURE_2D, 0)
-        #class_types = self.__annotations__
-        #print(class_types)
+
         self.__uniform_types_set = {int: glUniform1i,
                                     float: glUniform1f,
                                     _gl.sampler2D: glUniform1i,

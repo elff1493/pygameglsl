@@ -1,8 +1,6 @@
-import dis
 import ast
 from inspect import getsource, getfile
 from textwrap import dedent, indent
-import GLSL_helpers as _gl
 
 
 # print(_gl, "ob")
@@ -317,6 +315,97 @@ class Ops:
     def Not(self, node):  # todo test if works
         return "!"
 
+    def AST(self, node):
+        print("howd you get the bace class :/")
+        return ""
+
+    def AsyncFor(self, node):
+        self.errors.append("async is not supported in shader")
+        return ""
+
+    def AsyncFunctionDef(self, node):
+        self.errors.append("async is not supported in shader")
+        return ""
+
+    def AsyncWith(self, node):
+        self.errors.append("async is not supported in shader")
+        return ""
+
+    def AugLoad(self, node):
+        self.errors.append("augload is not supported in shader")
+        return ""
+
+    def Await(self, node):
+        self.errors.append("augload is not supported in shader")
+        return ""
+
+    def Bytes(self, node):
+        self.errors.append("Bytes is not supported in shader")
+        return ""
+
+    def ClassDef(self, node):
+        self.errors.append("ClassDef is not supported in shader")
+        return ""
+
+    def Del(self, node):
+        self.errors.append("Del is not supported in shader")
+        return ""
+
+    def Delete(self, node):
+        self.errors.append("Delete is not supported in shader")
+        return ""
+
+    def AugStore(self, node):
+        self.errors.append("AugStore is not supported in shader")
+        return ""
+
+    def withitem(self, node):
+        self.errors.append("with is not supported in shader")
+        return ""
+
+    def unaryop(self, node): # todo add unaryop
+        self.errors.append("unaryop is not supported in shader")
+        return ""
+
+    def type_ignore(self, node):
+        self.errors.append("type_ignore is not supported in shader")
+        return ""
+
+    def stmt(self, node):  # this is a bace type but ima add it for compleatness
+        self.errors.append("stmt is not supported in shader")
+        return ""
+
+    def slice(self, node):
+        self.errors.append("sliceing is not supported in shader, but indexing is")
+        return ""
+
+    def operator(self, node):  # bace class
+        self.errors.append("operator is not supported in shader")
+        return ""
+
+    def Yield(self, node):
+        self.errors.append("generators are not supported in shader")
+        return ""
+
+    def With(self, node):
+        self.errors.append("with is not supported in shader")
+        return ""
+
+    def UAdd(self, node):
+        return "+"
+
+    def DictComp(self, node):
+        self.errors.append("dictionary comprehension is not supported in shader")
+        return ""
+
+    def ExceptHandler(self, node):
+        self.errors.append("exeptions are not supported in shader")
+        return ""
+
+    def FormattedValue(self, node):
+        self.errors.append("strings are not supported in shader")
+        return ""
+
     calls = {
 
         "Not": Not,
@@ -370,9 +459,63 @@ class Ops:
         "IsNot": IsNot,
         "In": In,
         "NotIn": NotIn,
+        # not supported
+        "AST": AST,
+        "AsyncFor": AsyncFor,
+        "AsyncFunctionDef": AsyncFunctionDef,
+        "AsyncWith": AsyncWith,
+        "AugLoad": AugLoad,
+        "Await": Await,
+        "Bytes": Bytes,
+        "ClassDef": ClassDef,
+        "Del": Del,
+        "Delete": Delete,
+        "AugStore": AugStore,
+        "withitem": withitem,
+        "unaryop": unaryop,
+        "type_ignore": type_ignore,
+        "stmt": stmt,
+        "operator": operator,
+        "Yield": Yield,
+        "With": With,
+        "DictComp": DictComp,
+        "ExceptHandler": ExceptHandler,
+        "FormattedValue": FormattedValue
+        # todo add all
+        # [<class 'ast.Ellipsis'>, <class '_ast.Expression'>,
+        # <class '_ast.ExtSlice'>, <class '_ast.FloorDiv'>,
+        # <class '_ast.FunctionType'>, <class '_ast.GeneratorExp'>,
+        # <class '_ast.IfExp'>, <class '_ast.Import'>,
+        # <class '_ast.ImportFrom'>, <class '_ast.Interactive'>,
+        # <class '_ast.Invert'>, <class '_ast.JoinedStr'>,
+        # <class '_ast.LShift'>, <class '_ast.Lambda'>,
+        # <class '_ast.List'>, <class '_ast.ListComp'>,
+        # <class '_ast.MatMult'>, <class '_ast.Mod'>,
+        # <class 'ast.NameConstant'>, <class '_ast.NamedExpr'>,
+        # <class '_ast.Nonlocal'>, <class 'ast.Num'>,
+        # <class '_ast.Param'>, <class '_ast.Pass'>,
+        # <class '_ast.Pow'>, <class '_ast.RShift'>,
+        # <class '_ast.Raise'>, <class '_ast.Set'>,
+        # <class '_ast.SetComp'>, <class '_ast.Slice'>,
+        # <class '_ast.Starred'>, <class 'ast.Str'>,
+        # <class '_ast.Suite'>, <class '_ast.Try'>,
+        # <class '_ast.Tuple'>, <class '_ast.TypeIgnore'>,
+        # <class '_ast.UAdd'>, <class '_ast.YieldFrom'>,
+        # <class '_ast.alias'>, <class '_ast.arg'>,
+        # <class '_ast.arguments'>, <class '_ast.boolop'>,
+        # <class '_ast.cmpop'>, <class '_ast.comprehension'>,
+        # <class '_ast.excepthandler'>, <class '_ast.expr'>,
+        # <class '_ast.expr_context'>, <class '_ast.keyword'>,
+        # <class '_ast.mod'>, <class '_ast.slice'>]
     }
 
-owo2 = "owo\n\n\n\n\nowo"
+#import inspect todo remove when all ast implmented
+#a = dir(ast)
+#a = [getattr(ast, i) for i in a if inspect.isclass(getattr(ast, i))]
+#a = [i for i in a if issubclass(i, ast.AST)]
+#a = [i for i in a if i.__name__ not in Ops.calls.keys()]
+#print(a)
+
 def unindent(s):
     return s
 
@@ -385,6 +528,7 @@ class Recompiler:
         self.debug = False
         self.globals = {}
         self.uniforms = []
+        self.attributes = []
         self.import_as = ""
         # self.code = get_code(data.__code__) # todo replace with inspects get sorce
         # self.ast = ast.parse(self.code, type_comments=True)
@@ -418,6 +562,28 @@ class Recompiler:
 
         return "".join([a[i].__name__ + " " + i + ", " for i in a if i != "return"])[:-2]
 
+    def _make_fragment(self):
+        out = "#version 120\n"
+        out += "precision highp float;\n"
+        out += "varying vec2 fragCoord;\n"
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
+        # print(self.uniforms)
+        func = "".join([i.glsl + "\n" for i in self.functions])
+        out += func
+        self.fragment = out
+        return out
+
+    def _make_vertex(self):
+        out = "#version 120\n"
+        out += "precision highp float;\n"
+        out += "varying vec2 fragCoord;\n"
+        #out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
+        # print(self.uniforms)
+        func = "".join([i.glsl + "\n" for i in self.functions])
+        out += func
+        self.vertex = out
+        return out
+
     def run(self):
 
         # do uniforms, atrabutes, varing
@@ -427,14 +593,7 @@ class Recompiler:
         for i in self.functions:
             i.glsl = self.comp_func(i.callback)
         self.vertex = v
-        out = "#version 120\n"
-        out += "precision highp float;\n"
-        out += "varying vec2 fragCoord;\n"
-        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
-        #print(self.uniforms)
-        func = "".join([i.glsl + "\n" for i in self.functions])
-        out += func
-        self.fragment = out
+        self._make_fragment()
         #print(out)
 
     def _debug_tree(self, node, level=0):
