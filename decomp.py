@@ -28,10 +28,6 @@ uniform sampler2D textureObj;
 uniform vec3 iResolution;
 uniform float iTime;
 
-
-#define param 0.63
-
-
 %s
 
 """
@@ -306,6 +302,7 @@ class Ops:
 
     def FunctionDef(self, node):
         self.errors.append("nested functions are not supported")
+        #assert 1==2
         return ""
 
     def Global(self, node):
@@ -544,15 +541,16 @@ class Recompiler:
         op.atterl_remove.append(self.import_as)
         out = op.call(node)
         if op.errors:
+            print(self._debug_tree(node))
             raise Exception("\n".join(op.errors))
         t = f.__annotations__
         _type = t.get("return", None)
-        if _type == None:
+        if _type is None or _type == "None":
             _type = "void"
         else:
             _type = _type.__name__
         out = func.format(_type=_type, name=f.__name__, args=self.args(t), body=out)
-        #print(globals(), "g", globals()["owo2"])
+
         if self.debug:
             self._debug_tree(node)
             print(out)
@@ -574,7 +572,7 @@ class Recompiler:
         return out
 
     def _make_vertex(self):
-        out = "#version 120\n"
+        out = "#version 120\n" # todo custom version
         out += "precision highp float;\n"
         out += "varying vec2 fragCoord;\n"
         #out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])

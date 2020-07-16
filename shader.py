@@ -8,6 +8,8 @@ from glsl import v1_10 as _gl
 import glsl as _glsl
 import sys
 
+NEAREST = GL_NEAREST
+LINEAR = GL_LINEAR
 
 def arg_part(f, n):
     def gl_skip_mid(name, value):
@@ -15,8 +17,20 @@ def arg_part(f, n):
     return gl_skip_mid
 
 
-class Attribute:...  # todo
+class Attribute:
+    def __init__(self, _type, value=None, set=True, get=True):  # think of better name that dosnt shadow biltin or in
+        self.value = value
+        self.type = _type
+        self.name = ""
+        self.set = set
+        self.get = get
 
+    def __call__(self, name):
+        self.name = name
+        return self
+
+    def set_type(self, t):
+        self.type = t
 
 class Constant:  # todo
     def __init__(self, _type, value):
@@ -66,7 +80,8 @@ def fragment(f):
 
 
 class Texture:
-    def __init__(self, surface, filter=GL_LINEAR):
+    def __init__(self, surface, filter=LINEAR):
+        # todo add support for all type like rgb rgba...
         textureData = pygame.image.tostring(surface, "RGB", True)
         self.width = surface.get_width()
         self.height = surface.get_height()
@@ -80,16 +95,41 @@ class Texture:
         #self.size = (0, 0)
         self._surface = surface
 
+    def set_filter(self, filter_type): # todo seter ang geters/ per min/mag
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter_type)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter_type)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+    def set_wrap(self, f):  # todo add all
+        """sets how sampling outside the texture will be handled
+
+        """
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, f)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, f)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
     def set_surface(self, surface: pygame.Surface):
+        """sets the data of the texture to the data of the surface"""
         textureData = pygame.image.tostring(surface, "RGB", True)
         self.width = surface.get_width()
         self.height = surface.get_height()
         glBindTexture(GL_TEXTURE_2D, self.tex)
         glTexImage2D(GL_TEXTURE_2D, 0, 3, self.width, self.height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData)
 
-    def draw_top(self):
+    def draw_top(self, rect=None): # todo inplemnt
+        """draw the this texture on the screen, on top of the default surface,
+        this is done on the gpu and is fast
+        """
+        if not rect:
+            rect = (0, 0, self.width, self.height)
+        glViewport(rect[0], rect[1], rect[2], rect[3])
         glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glEnable(GL_TEXTURE_2D)
+
         glBegin(GL_QUADS)
         glTexCoord2f(0, 0)
         glVertex2f(-1, 1)
@@ -122,11 +162,12 @@ class Shader:
     is_compiled = False
     __fragment = ""
     __vertex = ""
-    __uniform_types_set = {int:glUniform1i,
-                           float:glUniform1f,
-                           _gl.sampler2D:glUniform1i,
-                           _gl.vec2:arg_part(glUniform2fv, 1),
-                           _gl.vec3:arg_part(glUniform3fv, 1)
+    __uniform_types_set = {int: glUniform1i,
+                           float: glUniform1f,
+                           _gl.sampler2D: glUniform1i,
+                           _gl.vec2: arg_part(glUniform2fv, 1),
+                           _gl.vec3: arg_part(glUniform3fv, 1),
+                           _gl.ivec2: arg_part(glUniform2iv, 1)
                            } # todo compleat types
     __uniform_types_get = {} # todo add
 
@@ -138,12 +179,12 @@ class Shader:
         self.glsl_vertex = ""
         self.glsl_funtions = []  # [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
         #self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
-        #self.__comp.debug = True
+
         self._fb_obj = None
         self.program = None
         self.__uniform_name = {}
         self._viewport = 0, 0, self._texture.width, self._texture.height
-        self.tex = 0
+        #self.tex = 0
 
     def __arg_part(self, f, n):
         p = self.program
@@ -153,6 +194,12 @@ class Shader:
 
         return gl_skip_mid
 
+    def set_target(self, texture):
+        self._texture = texture
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fb_obj)
+        #glBindTexture(GL_TEXTURE_2D, self._texture.tex)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._texture.tex, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def set_uniform(self, name, *value, _type="none"): # todo find a more direct way?
         """set the uniform, this should only be called in shader context"""
@@ -196,12 +243,16 @@ class Shader:
         ao = [getattr(self, i)(i) for i in dir(self) if isinstance(getattr(self, i), Attribute)]
         u = [(j.value, j.type, j.name) for j in
              uo]
+        a = [(j.value, j.type, j.name) for j in
+             ao]
 
-        glsl_funtions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
 
         compiler = Recompiler([])
-        compiler.functions = glsl_funtions
+        #compiler.debug = True
+        compiler.functions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
         compiler.uniforms = u
+        compiler.attributes = a
+
         m = sys.modules[self.__module__]
         for i in dir(m):
             if getattr(m, i) in (_gl, _glsl):
@@ -248,10 +299,10 @@ class Shader:
                     1, 1,
                     1, -1]
 
-        texcoords = [-1, -1,
-                     -1, 1,
+        texcoords = [0, 0,
+                     0, 1,
                      1.0, 1.0,
-                     1.0, -1]
+                     1.0, 0]
 
         vertices = numpy.array(vertices, dtype=numpy.float32)
         texcoords = numpy.array(texcoords, dtype=numpy.float32)
