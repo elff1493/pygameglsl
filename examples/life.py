@@ -29,39 +29,35 @@ class MyShader(Shader):
         gl_FragColor = g.vec4(f, f, f, 1.0)
 
 
-def main():
-    # pygame stuff
-    pygame.init()
-    window = pygame.display.set_mode((1000, 1000), HWSURFACE | OPENGL | DOUBLEBUF)
-    pygame.display.set_caption("game of life on gpu")
-    running = True
+# pygame stuff
+pygame.init()
+window = pygame.display.set_mode((1000, 1000), HWSURFACE | OPENGL | DOUBLEBUF)
+pygame.display.set_caption("game of life on gpu")
+running = True
 
-    # set random start
-    for x in range(window.get_width()):
-        for y in range(window.get_height()):
-            r = random.choice([255, 0])
-            window.set_at((x, y), (r, r, r))
+# set random start
+for x in range(window.get_width()):
+    for y in range(window.get_height()):
+        r = random.choice([255, 0])
+        window.set_at((x, y), (r, r, r))
 
-    # setup shader stuff
-    output = Texture(window, filter=NEAREST)
+# setup shader stuff
+output = Texture(window, filter=NEAREST)
 
-    my_shader = MyShader(output)
-    my_shader.compile()
-    my_shader.size = window.get_size()
-    my_shader.texture = output  # pass the render target in to the shader so we can see last frame
-    while running:
-        t = pygame.time.get_ticks()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+my_shader = MyShader(output)
+my_shader.compile()
+my_shader.size = window.get_size()
+my_shader.texture = output  # pass the render target in to the shader so we can see last frame
+while running:
+    t = pygame.time.get_ticks()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
-        my_shader.render()  # shader code called here
-        output.draw_top()  # this is hardware draw call, faster than getting the surface then bliting to the screen
-        pygame.display.flip()
-        print("time (millisecond): ", pygame.time.get_ticks() - t)
+    my_shader.render()  # shader code called here
+    output.draw_top()  # this is hardware draw call, faster than getting the surface then bliting to the screen
+    pygame.display.flip()
+    print("time (millisecond): ", pygame.time.get_ticks() - t)
 
-    pygame.quit()
+pygame.quit()
 
-
-if __name__ == "__main__":
-    main()
