@@ -5,6 +5,7 @@ from shader import Shader, fragment, Uniform, Texture, NEAREST
 import glsl as g
 import random
 
+
 class MyShader(Shader):
     def __init__(self, t):
         Shader.__init__(self, t)
@@ -19,7 +20,7 @@ class MyShader(Shader):
 
     @fragment
     def main(self):  # this function is called for for each pixel and run on the gpu
-        px: g.vec2 = g.ivec2(self.fragCoord * self.size)
+        px: g.vec2 = self.fragCoord * self.size
         px += 0.5  # just need to move half a pixle over so we sample the middle
         k: int = self.cell(px + g.ivec2(-1, -1)) + self.cell(px + g.ivec2(0, -1))
         k += self.cell(px + g.ivec2(1, -1)) + self.cell(px + g.ivec2(-1, 0)) + self.cell(px + g.ivec2(1, 0))
