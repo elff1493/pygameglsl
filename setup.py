@@ -8,7 +8,7 @@ setup(
    #author_email=' ',
    packages=['glsl'],  #same as name
    py_modules=["shader", 'decomp'],
-   install_requires=['pyopengl', 'pygame'],  # external packages as dependencies
+   install_requires=['pyopengl', 'pygame', "numpy"],  # external packages as dependencies
    #scripts=[
     #        'shader',
      #       'decomp',

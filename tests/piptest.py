@@ -1,11 +1,11 @@
 import pygame
 from pygame.locals import *
-from shader import Shader, fragment, Uniform, hw_flip, Texture, glGetString, GL_VERSION
+from shader import Shader, fragment, Uniform, hw_flip, Texture, ShaderFragment
 from glsl.v1_10 import sampler2D
 from glsl import v1_10 as g
 
 
-class MyShader(Shader):
+class MyShader(ShaderFragment):
     def __init__(self, t):
         Shader.__init__(self, t)
         self.iTime: float = Uniform(float)
@@ -13,7 +13,7 @@ class MyShader(Shader):
         self.iResolution = Uniform(g.vec3)
 
     @fragment
-    def get_p(self, p:g.vec2) -> g.vec2:
+    def get_p(self, p: g.vec2) -> g.vec2:
         return abs(p) / g.dot(p, p) - 0.63
 
     @fragment
@@ -30,6 +30,7 @@ class MyShader(Shader):
         gl_FragColor = g.vec4(g.vec3(de), 1.0)
         gl_FragColor = g.texture2D(self.textureObj, self.gl_FragCoord.xy)
         gl_FragColor.r = (g.sin(self.iTime)+1)/2
+
 
 def main():
     pygame.init()
