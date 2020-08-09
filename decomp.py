@@ -537,9 +537,9 @@ class Recompiler:
             _type = _type.__name__
         out = func.format(_type=_type, name=f.__name__, args=self.args(t), body=out)
 
-        if self.debug:
-            self._debug_tree(node)
-            print(out)
+        #if self.debug:
+            #self._debug_tree(node)
+            #print(out)
         return out
 
     def args(self, a):
@@ -550,12 +550,29 @@ class Recompiler:
         out = "#version " + str(self.version) + "\n"
         for i in self.fragment[2]:
             if i.inout in ("auto", "in", "inout"):  # todo add check for later in out syintax
-                out += "varying " + str(i.type) + i.name + ";\n"  # todo add interpolatin
+                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
         out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.fragment[1]])
+        out += "\n"
         out += "".join([(self.comp_func(i) + "\n") for i in self.fragment[3]])
         return out
 
     def _make_vertex(self):
+        out = "#version " + str(self.version) + "\n"
+        for t, n in self.vertex[4]:  # (type, name)
+            out += "attribute " + str(t.__name__) + " " + str(n) +";\n"
+        for i in self.vertex[2]:
+            if i.inout in ("auto", "out", "inout"):  # todo add check for later in out syintax
+                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.vertex[1]])
+        out += "\n"
+        out += "".join([(self.comp_func(i) + "\n") for i in self.vertex[3]])
+        return out
+
+
+
+
+
+
         out = "#version " + str(self.version) + "\n"
         #out += "precision highp float;\n"
         out += "varying vec2 fragCoord;\n"
@@ -586,14 +603,24 @@ class Recompiler:
         out = {}
         if self.fragment:
             out["fragment"] = self._make_fragment()
+            if self.debug:
+                print(out["fragment"])
         if self.geometry:
             out["geometry"] = self._make_geometry()
+            if self.debug:
+                print(out["geometry"])
         if self.vertex:
             out["vertex"] = self._make_vertex()
+            if self.debug:
+                print(out["vertex"])
         if self.tess_evaluation:
             out["tess_evaluation"] = self._make_tess_evaluation()
+            if self.debug:
+                print(out["tess_evaluation"])
         if self.tess_control:
             out["tess_control"] = self._make_tess_control()
+            if self.debug:
+                print(out["tess_control"])
 
         return out
 

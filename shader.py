@@ -2,6 +2,8 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import pygame
 import numpy
+import numpy as np
+import ctypes
 from typing import TypeVar, Generic
 from decomp import Recompiler
 import glsl as _gl
@@ -20,6 +22,7 @@ from glsl import v4_60 as _v4_60
 import glsl as _glsl
 import sys
 
+
 NEAREST = GL_NEAREST
 LINEAR = GL_LINEAR
 
@@ -37,7 +40,8 @@ class GlslArrayProxy:
 
 
 class Attribute:
-    def __init__(self, index):  # think of better name that dosnt shadow biltin or in
+    def __init__(self, _type, index):  # think of better name that dosnt shadow biltin or in
+        self.type = _type
         self.index = index
         self.name = ""
         self._id = None
@@ -45,7 +49,8 @@ class Attribute:
     def set_index(self, index):
         self.index = index
 
-    def name(self, name):
+
+    def set(self, name):
         self.name = name
         return self
 
@@ -63,7 +68,7 @@ class GlslVariable:
         self.inout = piping
         self.name = ""
 
-    def name(self, name):
+    def set(self, name):
         self.name = name
         return self
 
@@ -199,24 +204,67 @@ class Texture:
 class Vao:
     def __init__(self):
         self._id = glGenVertexArrays(1)
-        glBindVertexArray(self._id)
-
-        glBindVertexArray(0)
+        #self.normalized = False
+        self.__vbo = {}
 
     def __setitem__(self, key, value):
-        pass
+        # test if vbo, ibo...
+        self.__vbo[key] = value
+        glBindVertexArray(self._id)
+        glBindBuffer(GL_ARRAY_BUFFER, value._id)
+        glVertexAttribPointer(key, value.dimensions, value.type, value.normalised, 0, ctypes.c_void_p(0))
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+    def __getitem__(self, item):
+        return self.__vbo[item]
+
+    def enable(self, index):
+        glBindVertexArray(self._id)
+        glEnableVertexAttribArray(index)
+        glBindVertexArray(0)
+
+    def disable(self, index):
+        glBindVertexArray(self._id)
+        glDisableVertexAttribArray(index)
+        glBindVertexArray(0)
 
 
 class Vbo:
-    def __init__(self, size):
-        self._id = glGenBuffers(size)
+    _types = {np.byte: GL_BYTE,
+              np.ubyte: GL_UNSIGNED_BYTE,
+              np.short: GL_SHORT,
+              np.ushort: GL_UNSIGNED_SHORT,
+              np.intc: GL_INT,
+              np.uintc: GL_UNSIGNED_INT}
 
-    def set_data(self, data, _type=GL_DYNAMIC_DRAW, size=None): # todo split up
-        if not size:
-            size = len(data)
-        glBindBuffer(self._id)
+    def __init__(self):
+        self._id = glGenBuffers(1)
+        self.dimensions = None
+        self.len = 0
+        self.type = GL_INT
+        self.normalised = False
+
+    def set_data(self, data: numpy.array, _type=GL_DYNAMIC_DRAW):  # todo split up
+        #data = numpy.array([1, 2, 3], int)
+        size = data.nbytes
+        s = data.shape
+        #print(s)
+
+        self.len = s[0]
+        #print(type(data.dtype), data.dtype, dir(numpy.intc))
+        self.type = Vbo._types[data.dtype.type]
+
+        if len(s) > 2:
+            raise Exception("invalid array shape")
+        if len(s) > 1:
+            self.dimensions = s[1]
+            data = data.flatten()
+
+        glBindBuffer(GL_ARRAY_BUFFER, self._id)
         glBufferData(GL_ARRAY_BUFFER, size, data, _type)
-        glBindBuffer(0)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+
 
 
 _uniform_types_set = {
@@ -268,6 +316,11 @@ class ShaderVertex:
     def set_vao(self, vao: Vao):
         self.vao = vao
 
+    def _get_data(self):
+        glvar = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
+        funtions = [getattr(self, i).callback for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
+        return glvar, funtions
+
 
 class ShaderFragment:  # todo split shader types up, avoid god object/ support blank shaders
     #in
@@ -299,6 +352,11 @@ class ShaderFragment:  # todo split shader types up, avoid god object/ support b
 
     def render(self):
         self.program.render()
+
+    def _get_data(self):
+        glvar = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
+        funtions = [getattr(self, i).callback for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
+        return glvar, funtions
 
 
 class ShaderDefault: # placeolder
@@ -332,17 +390,21 @@ class Program:
 
     def render_vao(self, start=None, count=None):
         """render the vao"""
+        #glEnableClientState(GL_VERTEX_ARRAY)
         for i, j in enumerate(self.__active_textures):
-            glActiveTexture(GL_TEXTURE0 + i)
-            glBindTexture(GL_TEXTURE_2D, self.__active_textures[j].tex)
+            if j != -1:
+                glActiveTexture(GL_TEXTURE0 + i)
+                glBindTexture(GL_TEXTURE_2D, self.__active_textures[j].tex)
         glViewport(*self._viewport)
         glUseProgram(self._id)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
         if start is None:
             start = 0
         if count is None:
-            count = self._vao[0].size - start
-        glDrawArrays(GL_QUADS, start, count) # todo indexing
+            count = self._vao[0].len - start
+        glBindVertexArray(self._vao._id)
+        glDrawArrays(GL_TRIANGLES, start, count)  # todo indexing
+        # todo set render type
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
@@ -379,6 +441,8 @@ class Program:
 
     def compile(self): # todo make it not so long
         # 1. analise the objects
+        self._target_c = self.fragment._texture
+        self._vao = self.vertex.vao
         shader_obs = [self.fragment,
                    self.vertex,
                    self.geometry,
@@ -387,7 +451,7 @@ class Program:
         shader_obs = [i for i in shader_obs if i.__class__ is not ShaderDefault]
 
         # get uniforms, Attributes, piping varables, can be defined in any shader
-        uniforms = []
+        uniforms = {}
         attribute = []
         glsl_varables = []
         to_remove = []
@@ -397,7 +461,11 @@ class Program:
             # get all
             attribute.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), Attribute)])
             glsl_varables.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), GlslVariable)])
-            uniforms.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), Uniform)])
+            for i in dir(ob):
+                if isinstance(getattr(ob, i), Uniform):
+
+                    uniforms[i] = getattr(ob, i).set(i)
+            #uniforms.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), Uniform)])
             # find what modual was used for this shader
             # this is needed so glsl works right
             m = sys.modules[ob.__module__]
@@ -408,43 +476,50 @@ class Program:
                                      _v4_50, _v4_60):
                     to_remove.append(i)
                     break
-
+        uniforms = list(uniforms.values())
         # 2. ast compile, opengl compile
-        compiler = Recompiler([]) # todo make new for all pipiline
-        compiler.debug = True # self.debug
-        compiler.functions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        compiler.uniforms = [(j.value, j.type, j.name) for j in uniforms]
+        compiler = Recompiler([])  # todo make new for all pipiline
+        compiler.debug = True  # self.debug
+        #compiler.functions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
+        #compiler.uniforms = [(j.value, j.type, j.name) for j in uniforms]
         compiler.import_as = to_remove
         # get what the modual is imported as, to remove so glsl works right
-        # todo add remove here
+        # todo add removes here
         # compiler.attributes = a # todo add inouts
 
         # add all shaders to decompilers
         u = [(j.value, j.type, j.name) for j in
              uniforms]
-        temp = []
-        funtions = [getattr(self.fragment, i).callback for i in dir(self.fragment) if isinstance(getattr(self.fragment, i), GlslFuntion)]
-        compiler.fragment = ((None,), u, temp, funtions, None)
-
+        print("aa", attribute)
+        a = [(j.type, j.name) for j in attribute]  # todo remove dependancy
+        if self.fragment.__class__ is not ShaderDefault:  # todo tidy up
+            temp = self.fragment._get_data()  # gets (glslvar, funtions)
+            compiler.fragment = ((None,), u, temp[0], temp[1], None)
+        if self.vertex.__class__ is not ShaderDefault:
+            temp = self.vertex._get_data()
+            print(a)
+            compiler.vertex = ((None,), u, temp[0], temp[1], a)
         # todo add all
 
         codes = compiler.run()
-        key_code = {ShaderFragment: "fragment"}
+        key_code = {ShaderFragment: "fragment",
+                    ShaderVertex: "vertex"}
 
         # 2.5 opengl part
         shaders = []
-        keys = {ShaderFragment: GL_FRAGMENT_SHADER} # todo more shadres
-        print(shader_obs)
+        keys = {ShaderFragment: GL_FRAGMENT_SHADER,
+                ShaderVertex: GL_VERTEX_SHADER
+                } # todo more shadres
         for i in shader_obs:
             t = [bace for bace in i.__class__.__bases__ if bace in keys.keys()]
             if len(t) == 0:
+                print(i)
                 raise Exception("not a valid shader")
             elif len(t) > 1:
                 raise Exception("more than one shader bace is not compatable")
             t = t[0]
-            print(codes)
-            i.glsl = codes[key_code[t]]
             print(t)
+            i.glsl = codes[key_code[t]]
             s = compileShader(i.glsl, keys[t])
             shaders.append(s)
             #if glGetShaderiv(s) todo add shader compile error
@@ -454,7 +529,7 @@ class Program:
 
         for a in attribute:
             glBindAttribLocation(self._id, a.index, a.name)
-            a.set_index()
+            #a.set_index()
 
         glLinkProgram(self._id)
 
@@ -476,7 +551,7 @@ class Program:
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
         #glBindTexture(GL_TEXTURE_2D, self._.tex)
         if self._target_c:
-            #glBindTexture(GL_TEXTURE_2D, self._target_c.tex)
+            glBindTexture(GL_TEXTURE_2D, self._target_c.tex)
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._target_c.tex, 0)
         # todo mutiple colour buffers
         if self._target_d:
@@ -500,7 +575,6 @@ class Program:
         p = self._id
         if _type in (_gl.sampler2D, Texture):
             def set_from_texture(_, value):
-                print("set", value)
                 self.__active_textures[uname] = value
             return property(fset=set_from_texture)
 
@@ -603,7 +677,6 @@ class Shader:
                 break
 
         code = compiler.run()["fragment"]
-        print(code)
         fragmentShader = compileShader(code, GL_FRAGMENT_SHADER)
 
         self.program = glCreateProgram()
@@ -636,9 +709,9 @@ class Shader:
             def set_from_texture(self, value):
                 # print(value.tex)
                 self.__texture_uniforms[uname] = value
-                # glUseProgram(p)
-                # uset(uname, value.tex)
-                # glUseProgram(0)
+                glUseProgram(p)
+                uset(uname, value.tex)
+                glUseProgram(0)
 
             return property(fset=set_from_texture)
 
