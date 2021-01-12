@@ -49,14 +49,14 @@ def str_node(node):
 
 
 # todo add all ops
-# todo fix brackets (1+2)*3 is the same as 1+(2*3)
+# todo redundant brackets
 # todo custom line funtion to input raw glsl
 # todo uniforms, atrabutes, varing, constants
 # todo alasis for names. so something like "gl_FragColor" can be renamed to "output colour
 # done
 # todo structs
 # todo type testing so type hints can be minimsed
-
+# todo unpacking
 class Ops:
     def __init__(self, _globals):
         self.globals = _globals
@@ -79,7 +79,7 @@ class Ops:
         return "%s %s= %s" % (self.call(node.target), self.call(node.op), self.re_expression(node.value))
 
     def Constant(self, node):
-        return str(node.value)  # todo test if sting or invaild
+        return str(node.value)
 
     def Div(self, node):
         return "/"
@@ -99,7 +99,7 @@ class Ops:
     def Call(self, node):
         return "%s(%s)" % (self.call(node.func), self.unpack(node))
 
-    def Assign(self, node):  # todo unpacking
+    def Assign(self, node):
         if len(node.targets) > 1:
             raise Exception("unpacking not supported yet")
         return "%s = %s" % (self.call(node.targets[0]), self.call(node.value))
@@ -169,12 +169,12 @@ class Ops:
         body_else = ""
         if node.orelse:
             body_else = " else {\n%s} " % self.re_body(node.orelse)
-        return "if (%s)\n{\n %s}%s" % (name, body, body_else)  # todo add else
+        return "if (%s)\n{\n %s}%s\n" % (name, body, body_else)  # todo test else
 
     def Expr(self, node):
         return self.re_expression(node)
 
-    def For(self, node):  # todo float step, for each, neg step
+    def For(self, node):  # todo for each, neg step
         t = "int"
         name = self.call(node.target)
         args = node.iter.args
@@ -186,9 +186,15 @@ class Ops:
         elif len(args) == 2:
             start = self.call(args[0])
             end = self.call(args[1])
+        elif len(args) == 3:
+            start = self.call(args[0])
+            end = self.call(args[1])
+            step = self.call(args[2])
         else:
-            pass
+            raise Exception("to many arguments to range")
 
+        if not all((float(start).is_integer(), float(end).is_integer(), float(step).is_integer())):
+            t = "float"
         body = self.re_body(node.body)
         f = f"for ({t} {name}={start};{name}<{end};{name}+={step}){{\n{body}\n}}"
         return f
@@ -214,7 +220,7 @@ class Ops:
     def And(self, node):
         return " && "
 
-    def BoolOp(self, node):  # todo test
+    def BoolOp(self, node):
         op = self.call(node.op)
         # return "this one"
         return "(" + self.call(node.values[0]) + op + self.call(node.values[1]) + ")"
@@ -489,14 +495,6 @@ class Ops:
     }
 
 
-# import inspect todo remove when all ast implmented
-# a = dir(ast)
-# a = [getattr(ast, i) for i in a if inspect.isclass(getattr(ast, i))]
-# a = [i for i in a if issubclass(i, ast.AST)]
-# a = [i for i in a if i.__name__ not in Ops.calls.keys()]
-# print(a)
-
-
 class Recompiler:
     def __init__(self, functions):
         #self.functions = functions
@@ -549,8 +547,12 @@ class Recompiler:
     def _make_fragment(self):
         out = "#version " + str(self.version) + "\n"
         for i in self.fragment[2]:
+            print(i, i.inout)
             if i.inout in ("auto", "in", "inout"):  # todo add check for later in out syintax
                 out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+            elif i.inout in ("out",):
+                if self.version < 130: # todo is right?
+                    out += "#define " + i.name + " gl_FragColor\n"
         out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.fragment[1]])
         out += "\n"
         out += "".join([(self.comp_func(i) + "\n") for i in self.fragment[3]])
@@ -559,7 +561,7 @@ class Recompiler:
     def _make_vertex(self):
         out = "#version " + str(self.version) + "\n"
         for t, n in self.vertex[4]:  # (type, name)
-            out += "attribute " + str(t.__name__) + " " + str(n) +";\n"
+            out += "attribute " + str(t.__name__) + " " + str(n) + ";\n"
         for i in self.vertex[2]:
             if i.inout in ("auto", "out", "inout"):  # todo add check for later in out syintax
                 out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin

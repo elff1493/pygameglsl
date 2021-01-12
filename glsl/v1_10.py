@@ -79,7 +79,7 @@ class void: ...
 
 class struct:
     def __init__(self, **kwargs): # todo
-        setattr(self, )
+        #setattr(self, 4)
         for i in self.__class__.__annotations__:
             print(i)
 

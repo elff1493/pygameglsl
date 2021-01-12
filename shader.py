@@ -25,7 +25,9 @@ import sys
 
 NEAREST = GL_NEAREST
 LINEAR = GL_LINEAR
-
+GL_DEPTH_COMPONENT = GL_DEPTH_COMPONENT
+clear = glClear
+colorb = GL_COLOR_BUFFER_BIT
 
 class GlslArrayProxy:
     def __init__(self, name):
@@ -63,7 +65,7 @@ AUTO = "auto"
 
 
 class GlslVariable:
-    def __init__(self, _type, piping=AUTO):  # todo rename
+    def __init__(self, _type, piping=AUTO):
         self.type = _type
         self.inout = piping
         self.name = ""
@@ -89,7 +91,7 @@ class Uniform(Generic[T]):
         self.type = _type
         self.name = ""
 
-    def set(self, name):  # todo remove, bad practis
+    def set(self, name):
         self.name = name
         return self
 
@@ -122,20 +124,68 @@ def fragment(f):
 
 
 class Texture:
-    def __init__(self, surface, filter=LINEAR):
+    active = {}
+    default = 0
+
+    def __init__(self):
         # todo add support for all type like rgb rgba...
-        textureData = pygame.image.tostring(surface, "RGB", True)
-        self.width = surface.get_width()
-        self.height = surface.get_height()
+        self.width = 0
+        self.height = 0
+        #if surface:
+        #    self.width = surface.get_width()
+        #    self.height = surface.get_height()
+        #    surface = pygame.image.tostring(surface, "RGB", True)
+        #   pixel_format = GL_RGB
+
         self.tex = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.tex)
-        glTexImage2D(GL_TEXTURE_2D, 0, 3, self.width, self.height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter)
-        glBindTexture(GL_TEXTURE_2D, 0)
+        #glBindTexture(GL_TEXTURE_2D, self.tex)
+        #glTexImage2D(GL_TEXTURE_2D, 0, pixel_format, self.width, self.height, 0, pixel_format, GL_UNSIGNED_BYTE, surface)
+        #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter)
+        #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter)
+        #glBindTexture(GL_TEXTURE_2D, 0)
+        self._format = None
+        self._active_index = None
+        self.default += 1
         # self._id = 0
         # self.size = (0, 0)
-        self._surface = surface
+        #self._surface = surface
+
+    @classmethod
+    def from_surface(cls, surface):
+        t = Texture()
+        t.set_surface(surface)
+        return t
+
+    @classmethod
+    def from_size(cls, size, internal_format=GL_RGB, precision=GL_FLOAT):
+        t = Texture()
+
+        t.width = size[0]
+        t.height = size[1]
+        glBindTexture(GL_TEXTURE_2D, t.tex)
+        glTexImage2D(GL_TEXTURE_2D, 0, internal_format, t.width, t.height, 0, internal_format, precision, None)
+        #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        return t
+
+    @classmethod
+    def new_depth(cls):
+        t = Texture()
+        t.set_surface(surface)
+        return t
+
+    @classmethod
+    def from_empty(cls):
+        t = Texture()
+        t.set_surface(surface)
+        return t
 
     def set_filter(self, filter_type):  # todo seter ang geters/ per min/mag
         glBindTexture(GL_TEXTURE_2D, self.tex)
@@ -152,17 +202,19 @@ class Texture:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, f)
         glBindTexture(GL_TEXTURE_2D, 0)
 
-    def set_surface(self, surface: pygame.Surface):
+    def set_surface(self, surface: pygame.Surface, surface_format=GL_RGB, internal_format=GL_RGB):
         """sets the data of the texture to the data of the surface"""
-        textureData = pygame.image.tostring(surface, "RGB", True)
+        textureData = pygame.image.tostring(surface, "RGB", True)  # todo add
         self.width = surface.get_width()
         self.height = surface.get_height()
         glBindTexture(GL_TEXTURE_2D, self.tex)
-        glTexImage2D(GL_TEXTURE_2D, 0, 3, self.width, self.height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.width, self.height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
     def draw_top(self, rect=None):  # todo inplemnt
         """draw the this texture on the screen, on top of the default surface,
-        this is done on the gpu and is fast
+        this is done on the gpu and is fast (should be havent bechmarked)
         """
         if not rect:
             rect = (0, 0, self.width, self.height)
@@ -194,11 +246,12 @@ class Texture:
     def _bind(self):
         glBindTexture(GL_TEXTURE_2D, self.tex)
 
-    def set_image(self):
-        pass
-
-    def get_image(self):
-        pass
+    def set_active(self, index):
+        glActiveTexture(GL_TEXTURE0 + index)
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        self._active_index = index
 
 
 class Vao:
@@ -231,12 +284,22 @@ class Vao:
 
 
 class Vbo:
-    _types = {np.byte: GL_BYTE,
-              np.ubyte: GL_UNSIGNED_BYTE,
-              np.short: GL_SHORT,
-              np.ushort: GL_UNSIGNED_SHORT,
-              np.intc: GL_INT,
-              np.uintc: GL_UNSIGNED_INT}
+    buffert = GL_ARRAY_BUFFER
+    _types = {#ints
+            np.byte: GL_BYTE,
+            np.ubyte: GL_UNSIGNED_BYTE,
+            np.short: GL_SHORT,
+            np.ushort: GL_UNSIGNED_SHORT,
+            np.intc: GL_INT,
+            np.uintc: GL_UNSIGNED_INT,
+            # floats
+            np.float16: GL_HALF_FLOAT,
+            np.float32: GL_FLOAT,
+            np.float64: GL_DOUBLE
+
+        #GL_FLOAT, GL_DOUBLE, GL_FIXED
+
+              }
 
     def __init__(self):
         self._id = glGenBuffers(1)
@@ -245,26 +308,28 @@ class Vbo:
         self.type = GL_INT
         self.normalised = False
 
-    def set_data(self, data: numpy.array, _type=GL_DYNAMIC_DRAW):  # todo split up
-        #data = numpy.array([1, 2, 3], int)
+    def set_data(self, data: numpy.array, _type=GL_DYNAMIC_DRAW, dimensions=None):
         size = data.nbytes
         s = data.shape
-        #print(s)
-
         self.len = s[0]
-        #print(type(data.dtype), data.dtype, dir(numpy.intc))
         self.type = Vbo._types[data.dtype.type]
 
         if len(s) > 2:
             raise Exception("invalid array shape")
-        if len(s) > 1:
-            self.dimensions = s[1]
+        if len(s) >= 1:
+            if not dimensions:
+                self.dimensions = s[1]
+            else:
+                self.dimensions = dimensions
             data = data.flatten()
+        b = self.__class__.buffert
+        glBindBuffer(b, self._id)
+        glBufferData(b, size, data, _type)
+        glBindBuffer(b, 0)
 
-        glBindBuffer(GL_ARRAY_BUFFER, self._id)
-        glBufferData(GL_ARRAY_BUFFER, size, data, _type)
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
 
+class Ebo(Vbo):  # todo add check for  array type ( it isnt the same as vbo)
+    buffert = GL_ELEMENT_ARRAY_BUFFER
 
 
 _uniform_types_set = {
@@ -278,6 +343,7 @@ _uniform_types_set = {
         _gl.ivec2: glUniform2i,
         _gl.ivec3: glUniform3i,
         _gl.ivec4: glUniform4i,
+        _gl.mat4: lambda pos, v: glUniformMatrix4fv(pos, True, 1, v)
         # glUniform1ui # glUniform2ui # glUniform3ui # glUniform4ui
         #
         # glUniform1fv # glUniform2fv # glUniform3fv # glUniform4fv
@@ -306,7 +372,8 @@ class ShaderTessControl:
 
 
 class ShaderGeometry:
-    pass
+    def __init__(self, max_vertices, in_type, out_type):
+        self._translation = (max_vertices, in_type, out_type)
 
 
 class ShaderVertex:
@@ -322,7 +389,7 @@ class ShaderVertex:
         return glvar, funtions
 
 
-class ShaderFragment:  # todo split shader types up, avoid god object/ support blank shaders
+class ShaderFragment:
     #in
     gl_FragCoord: int
     gl_FrontFacing: bool
@@ -344,11 +411,20 @@ class ShaderFragment:  # todo split shader types up, avoid god object/ support b
         self._texture = texture
         self.program = None
 
-    def compile(self):
-        p = Program()
-        p.fragment = self
-        p._target_c = self._texture # todo seter and getrer
-        p.compile()
+    @property
+    def texture(self):
+        """can use before .compile"""
+        return self.program._target_c
+
+    @texture.setter
+    def texture(self, t):
+        self.program._target_c = t
+
+    #def compile(self):
+        #p = Program()
+        #p.fragment = self
+        #p._target_c = self._texture
+        #p.compile()
 
     def render(self):
         self.program.render()
@@ -359,7 +435,7 @@ class ShaderFragment:  # todo split shader types up, avoid god object/ support b
         return glvar, funtions
 
 
-class ShaderDefault: # placeolder
+class ShaderDefault:  # placeolder
     """if this is set as a shader the defult shader for that part of the pipline will be used"""
     pass
 
@@ -373,8 +449,7 @@ class Program:
         self._fb = 0
         self._vao = None
 
-
-        self._target_c = None
+        self._target_c = None  # todo setters / getters
         self._target_d = None
         self._target_s = None
 
@@ -383,39 +458,73 @@ class Program:
         self.vertex = ShaderDefault()
         self.tess_evaluation = ShaderDefault()
         self.tess_control = ShaderDefault()
-        # cant use compute shader in this pipline, it has its own
+        # cant use compute shader in this pipline, it has its own pipline
+        self.options = Options()
         self.debug = False
-        self._viewport = 0, 0, 100, 100
-        self.__active_textures = {} # key is name, value is texture
+        self.version = 120  # todo make default to latest
+        self._viewport = 0, 0, 100, 100  # todo make not default to 100
+        self.__active_textures = {}  # key is name, value is texture
 
-    def render_vao(self, start=None, count=None):
+    def clear(self):
+        glUseProgram(self._id)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
+        glClearColor(0.1, 0.1, 0.1, 1)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def cleard(self):
+        glUseProgram(self._id)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
+        glClearColor(0.1, 0.1, 0.1, 1)
+        glClear(GL_DEPTH_BUFFER_BIT)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def render_vao(self, start=None, count=None, primitive=GL_TRIANGLES):
         """render the vao"""
         #glEnableClientState(GL_VERTEX_ARRAY)
-        for i, j in enumerate(self.__active_textures):
-            if j != -1:
-                glActiveTexture(GL_TEXTURE0 + i)
-                glBindTexture(GL_TEXTURE_2D, self.__active_textures[j].tex)
+
         glViewport(*self._viewport)
         glUseProgram(self._id)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
-        if start is None:
+        if start is None:  # default
             start = 0
-        if count is None:
+        if count is None:  # assume size
             count = self._vao[0].len - start
         glBindVertexArray(self._vao._id)
-        glDrawArrays(GL_TRIANGLES, start, count)  # todo indexing
-        # todo set render type
+        glDrawArrays(primitive, start, count)  # todo indexing
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
-    def render_instance(self, n):
-        pass
+    def render_instance(self, n,  start=None, count=None, primitive=GL_TRIANGLES): # todo
+        glViewport(*self._viewport)
+        glUseProgram(self._id)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
+        if start is None:  # default
+            start = 0
+        if count is None:  # assume size
+            count = self._vao[0].len - start
+        glBindVertexArray(self._vao._id)
+        glDrawArraysInstanced(primitive, start, count, n)  # todo indexing
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
+
+    def render_vao_indexed(self, ebo: Ebo, start=None, count=None, primitive=GL_TRIANGLES):
+        # todo add start
+        glViewport(*self._viewport)
+        glUseProgram(self._id)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
+        if start is None:  # default
+            start = 0
+        if count is None:  # assume size
+            count = self._vao[0].len - start
+        glBindVertexArray(self._vao._id)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo._id)
+        glDrawElements(primitive, ebo.len, ebo.type, None)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
 
     def render(self):
         """render the shader on to the texture"""
-        for i, j in enumerate(self.__active_textures):
-            glActiveTexture(GL_TEXTURE0 + i)
-            glBindTexture(GL_TEXTURE_2D, self.__active_textures[j].tex)
         glViewport(*self._viewport)
         glUseProgram(self._id)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
@@ -439,7 +548,7 @@ class Program:
     def _compile_shader(self):
         pass
 
-    def compile(self): # todo make it not so long
+    def compile(self):  # todo make it not so long
         # 1. analise the objects
         self._target_c = self.fragment._texture
         self._vao = self.vertex.vao
@@ -463,9 +572,7 @@ class Program:
             glsl_varables.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), GlslVariable)])
             for i in dir(ob):
                 if isinstance(getattr(ob, i), Uniform):
-
                     uniforms[i] = getattr(ob, i).set(i)
-            #uniforms.extend([getattr(ob, i).set(i) for i in dir(ob) if isinstance(getattr(ob, i), Uniform)])
             # find what modual was used for this shader
             # this is needed so glsl works right
             m = sys.modules[ob.__module__]
@@ -477,11 +584,11 @@ class Program:
                     to_remove.append(i)
                     break
         uniforms = list(uniforms.values())
+
         # 2. ast compile, opengl compile
-        compiler = Recompiler([])  # todo make new for all pipiline
-        compiler.debug = True  # self.debug
-        #compiler.functions = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        #compiler.uniforms = [(j.value, j.type, j.name) for j in uniforms]
+        compiler = Recompiler([])
+        compiler.version = self.version
+        compiler.debug = self.debug
         compiler.import_as = to_remove
         # get what the modual is imported as, to remove so glsl works right
         # todo add removes here
@@ -490,83 +597,99 @@ class Program:
         # add all shaders to decompilers
         u = [(j.value, j.type, j.name) for j in
              uniforms]
-        print("aa", attribute)
         a = [(j.type, j.name) for j in attribute]  # todo remove dependancy
         if self.fragment.__class__ is not ShaderDefault:  # todo tidy up
             temp = self.fragment._get_data()  # gets (glslvar, funtions)
             compiler.fragment = ((None,), u, temp[0], temp[1], None)
         if self.vertex.__class__ is not ShaderDefault:
             temp = self.vertex._get_data()
-            print(a)
             compiler.vertex = ((None,), u, temp[0], temp[1], a)
+
+        if self.geometry.__class__ is not ShaderDefault:
+            raise Exception("not supported yet")
+
+        if self.tess_control.__class__ is not ShaderDefault:
+            raise Exception("not supported yet")
+
+        if self.tess_evaluation.__class__ is not ShaderDefault:
+            raise Exception("not supported yet")
+
+        # todo geomrtry
+        # todo tess controll
+        # todo tess eval
         # todo add all
 
         codes = compiler.run()
         key_code = {ShaderFragment: "fragment",
-                    ShaderVertex: "vertex"}
+                    ShaderVertex: "vertex",
+                    ShaderGeometry: "geometry",
+                    ShaderTessControl: "tess_control",
+                    ShaderTessEvaluation: "tess_evaluation"
+                    }
 
         # 2.5 opengl part
-        shaders = []
+        shaders = []  # for clean up
         keys = {ShaderFragment: GL_FRAGMENT_SHADER,
-                ShaderVertex: GL_VERTEX_SHADER
-                } # todo more shadres
+                ShaderVertex: GL_VERTEX_SHADER,
+                ShaderGeometry: GL_GEOMETRY_SHADER,
+                ShaderTessEvaluation: GL_TESS_EVALUATION_SHADER,
+                ShaderTessControl: GL_TESS_CONTROL_SHADER
+                }
+
         for i in shader_obs:
             t = [bace for bace in i.__class__.__bases__ if bace in keys.keys()]
             if len(t) == 0:
-                print(i)
                 raise Exception("not a valid shader")
             elif len(t) > 1:
-                raise Exception("more than one shader bace is not compatable")
+                raise Exception("more than one shader base is not compatible")
             t = t[0]
-            print(t)
             i.glsl = codes[key_code[t]]
-            s = compileShader(i.glsl, keys[t])
-            shaders.append(s)
-            #if glGetShaderiv(s) todo add shader compile error
+            shaders.append(compileShader(i.glsl, keys[t]))
+
         self._id = glCreateProgram()
         for i in shaders:
             glAttachShader(self._id, i)
 
-        for a in attribute:
+        for a in attribute:  # set attribute location, needs to be done before linking
             glBindAttribLocation(self._id, a.index, a.name)
-            #a.set_index()
 
         glLinkProgram(self._id)
-
+        # clean up
         for i in shaders:
             glDeleteShader(i)
-
-        if not glGetProgramiv(self._id, GL_LINK_STATUS):  # todo test
+        if not glGetProgramiv(self._id, GL_LINK_STATUS):
             raise Exception("shader link error")
 
         # 3. seters, geters
         for ob in shader_obs:
-            for u in uniforms: # todo
-            #self.__uniform_name[i.name] = glGetUniformLocation(self._id, i.name)
+            for u in uniforms:  # todo find a object baced way for nice setters and geters
                 setattr(ob.__class__, u.name, self.__getter(u.name, u.type))
 
-        #4. init, shader is compiled, just need to set up thing that cant be set up beforhand
+        # 4. init, shader is compiled, just need to set up thing that cant be set up beforhand
 
         self._fb = glGenFramebuffers(1)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
         #glBindTexture(GL_TEXTURE_2D, self._.tex)
-        if self._target_c:
-            glBindTexture(GL_TEXTURE_2D, self._target_c.tex)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._target_c.tex, 0)
+
         # todo mutiple colour buffers
-        if self._target_d:
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self._target_d.tex, 0)
+
         if self._target_s:
+            self._viewport = 0, 0, self._target_s.width, self._target_s.height
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, self._target_c.tex, 0)
 
+        if self._target_d:
+            self._viewport = 0, 0, self._target_d.width, self._target_d.height
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self._target_d.tex, 0)
 
-        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-        if status != GL_FRAMEBUFFER_COMPLETE:
-            raise Exception("frame buffer error - incomplete")
+        if self._target_c:
+            self._viewport = 0, 0, self._target_c.width, self._target_c.height
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._target_c.tex, 0)
+
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            t = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+            raise Exception("frame buffer error - incomplete " + str(t))
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        self._viewport = 0, 0, self._target_c.width, self._target_c.height
 
 
     def __getter(self, name, _type):
@@ -574,8 +697,17 @@ class Program:
         uname = glGetUniformLocation(self._id, name)
         p = self._id
         if _type in (_gl.sampler2D, Texture):
-            def set_from_texture(_, value):
-                self.__active_textures[uname] = value
+            def set_from_texture(self, value):
+                glUseProgram(p)
+                if type(value) is Texture:
+                    if value._active_index is None:
+                        raise ValueError("Texture is not active, can not set uniform")
+                    print("set as", value._active_index)
+                    uset(uname, value._active_index)
+                elif type(value) is int:
+                    uset(uname, value)
+                glUseProgram(0)
+
             return property(fset=set_from_texture)
 
         def set_uniform(_, value):
@@ -589,100 +721,154 @@ class Program:
         return property(fset=set_uniform, fget=get_uniform)
 # todo test multipul shaders
 
+class Options:
+    def __init__(self):
+        pass
+    @property
+    def DEPTH_TEST(self):
+        return glGetBooleanv(GL_DEPTH_TEST)
+
+    @DEPTH_TEST.setter
+    def DEPTH_TEST(self, value):
+        if value:
+            glEnable(GL_DEPTH_TEST)
+        else:
+            glDisable(GL_DEPTH_TEST)
+
+    @property
+    def DepthMask(self):
+        return None
+
+    @DepthMask.setter
+    def DepthMask(self, value):
+        glDepthMask(value)
+
+    @property
+    def ClearDepth(self):
+        return None
+
+    @ClearDepth.setter
+    def ClearDepth(self, value):
+        glClearDepth(value)
+
+    @property
+    def ClearDepth(self):
+        return None
+
+    @ClearDepth.setter
+    def ClearDepth(self, value):
+        glClearDepth(value)
+
+    @property
+    def DepthFunc(self):
+        return None
+
+    @DepthFunc.setter
+    def DepthFunc(self, value):
+        glDepthFunc(value)
+
+    @property
+    def ALPHA_TEST(self):
+        return None
+
+    @ALPHA_TEST.setter
+    def ALPHA_TEST(self, value):
+        if value:
+            glEnable(GL_ALPHA_TEST)
+        else:
+            glDisable(GL_ALPHA_TEST)
+
+    @property
+    def ALPHA_TEST(self):
+        return None
+
+    @ALPHA_TEST.setter
+    def ALPHA_TEST(self, value):
+        if value:
+            glEnable(GL_ALPHA_TEST)
+        else:
+            glDisable(GL_ALPHA_TEST)
+
 
 class Shader:
-
-    __uniform_types_get = {}  # todo add
+    # in
+    gl_FragCoord: _gl.vec4
+    gl_FrontFacing: bool
+    gl_PointCoord: _gl.vec2
+    # out
+    gl_FragColor: _gl.vec4  # removed after v3.1,
+    # define your own output with
+    # self.foo = GlslVariable(piping=OUT)
 
     def __init__(self, texture: Texture):
         self._texture = texture
         self.__texture_uniforms = {}
         self.glsl_fragment = ""
-        #self.glsl_funtions = []  # [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        # self.__comp = Recompiler([]) # todo move, dont need to keep a refrace all the time
-
         self._fb_obj = None
         self.program = None
         self.__uniform_name = {}
         self._viewport = 0, 0, self._texture.width, self._texture.height
-        # self.tex = 0
-
+        self.debug = False
 
     def set_target(self, texture):
-        """set taget, requires compilation"""
+        """set target to render to, requires compilation"""
         self._texture = texture
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb_obj)
-        # glBindTexture(GL_TEXTURE_2D, self._texture.tex)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._texture.tex, 0)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-
     def viewport(self, x, y, w, h):
-        """set the view port. the view port by default is the size of the texture"""
+        """set the view port. the view port by default is the size of the texture (set when compiled)"""
         self._viewport = (x, y, w, h)
 
     def render(self):
-        """render the shader on to the texture"""
-        for i, j in enumerate(self.__texture_uniforms):
-            glActiveTexture(GL_TEXTURE0 + i)
-            glBindTexture(GL_TEXTURE_2D, self.__texture_uniforms[j].tex)
+        """render the shader on to the texture target"""
+        #print(self.__texture_uniforms)
+        #for i, j in enumerate(self.__texture_uniforms):
+            #print(i, j, "tex")
+            #glActiveTexture(GL_TEXTURE0 + i)
+            #glBindTexture(GL_TEXTURE_2D, self.__texture_uniforms[j].tex)
         glViewport(*self._viewport)
         glUseProgram(self.program)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb_obj)
+        glDrawArrays(GL_QUADS, 0, 4)
 
-        glEnable(GL_TEXTURE_2D)
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 0)
-        glVertex2f(-1, 1)
-        glTexCoord2f(0, 1)
-        glVertex2f(-1, -1)
-        glTexCoord2f(1, 1)
-        glVertex2f(1, -1)
-        glTexCoord2f(1, 0)
-        glVertex2f(1, 1)
-        glEnd()
-        glDisable(GL_TEXTURE_2D)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
-    def _uniform_bach(self):
-        pass
-
-    def compile_from_file(self, fragment_path, vertex_path):  # todo add all shaders
-        pass
-
-    def compile(self):
-        """compile the shader for use and create atrabute seter and getters"""
+    def compile_from_string(self, code):
+        v = """
+#version 120
+attribute vec2 vPosition;
+attribute vec2 vTexcoords;
+varying vec2 {0};
+void main()
+{{
+    gl_Position = vec4(vPosition.x, vPosition.y, 0.0, 1.0);
+    {0} = vTexcoords;
+}}
+        """
         uo = [getattr(self, i).set(i) for i in dir(self) if isinstance(getattr(self, i), Uniform)]
-        #glvar = [getattr(self, i).set(i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
-
-        u = [(j.value, j.type, j.name) for j in
-             uo]
-        #temp = [(j.value, j.type, j.name) for j in
-             #uo]
-        temp = []
-        funtions = [getattr(self, i).callback for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
-        compiler = Recompiler([])
-        # compiler.debug = True
-        compiler.fragment = ((None,), u, temp, funtions, None)
-
-        m = sys.modules[self.__module__]
-        for i in dir(m):
-            if getattr(m, i) in (_gl, _glsl, _v1_10, _v1_20,
-                                 _v1_30, _v1_40, _v1_50, _v3_30,
-                                 _v4_10, _v4_20, _v4_30, _v4_40,
-                                 _v4_50, _v4_60):
-                compiler.import_as = i
-                break
-
-        code = compiler.run()["fragment"]
+        glname = [getattr(self, i).set(i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
+        glin = [i for i in glname if i.inout == IN]
+        if len(glin) > 1:
+            raise Exception("multiple in values not aloud")
+        if not glin:
+            glin = "fragCoord"
+        else:
+            glin = glin[0].name
+        if self.debug:
+            print(v.format(glin))
+        default_vertex = compileShader(v.format(glin), GL_VERTEX_SHADER)
         fragmentShader = compileShader(code, GL_FRAGMENT_SHADER)
 
         self.program = glCreateProgram()
         glAttachShader(self.program, fragmentShader)
+        glAttachShader(self.program, default_vertex)
         glLinkProgram(self.program)
         glDeleteShader(fragmentShader)
+        glDeleteShader(default_vertex)
 
         self._fb_obj = glGenFramebuffers(1)
         glBindFramebuffer(GL_FRAMEBUFFER, self._fb_obj)
@@ -695,35 +881,84 @@ class Shader:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-        for v, t, n in u:
-            self.__uniform_name[n] = glGetUniformLocation(self.program, n)
-            setattr(self.__class__, n, self.f_gen(n, t)) # todo make object baceded?
+        for i in uo:
+            self.__uniform_name[i.name] = glGetUniformLocation(self.program, i.name)
+            setattr(self.__class__, i.name, self.f_gen(i.name, i.type))
+
+        vertices = [-1, -1,
+                    -1, 1,
+                    1, 1,
+                    1, -1]
+
+        texcoords = [0, 0,
+                     0, 1,
+                     1.0, 1.0,
+                     1.0, 0]
+
+        vertices = numpy.array(vertices, dtype=numpy.float32)
+        texcoords = numpy.array(texcoords, dtype=numpy.float32)
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, vertices)  # todo find better way
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, texcoords)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+
+    def __get_code(self, u):
+        funtions = [getattr(self, i).callback for i in dir(self) if isinstance(getattr(self, i), GlslFuntion)]
+        compiler = Recompiler([])
+        compiler.debug = self.debug
+        u = [(j.value, j.type, j.name) for j in u]
+        glvar = [getattr(self, i).set(i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
+        compiler.fragment = ((None,), u, glvar, funtions, None)
+
+        m = sys.modules[self.__module__]
+        for i in dir(m):
+            if getattr(m, i) in (_gl, _glsl, _v1_10, _v1_20,
+                                 _v1_30, _v1_40, _v1_50, _v3_30,
+                                 _v4_10, _v4_20, _v4_30, _v4_40,
+                                 _v4_50, _v4_60):
+                compiler.import_as = i
+                break
+
+        return compiler.run()["fragment"]
+
+    def compile(self):
+        """compile the shader for use and create attribute setter and getters"""
+        uo = [getattr(self, i).set(i) for i in dir(self) if isinstance(getattr(self, i), Uniform)]
+
+        code = self.__get_code(uo)
+        self.compile_from_string(code)
 
     def f_gen(self, name, _type):
 
         uset = _uniform_types_set[_type]
-        #        uget = Shader.__uniform_types_get[_type]
         uname = self.__uniform_name[name]
         p = self.program
         if _type == _gl.sampler2D:
             def set_from_texture(self, value):
-                # print(value.tex)
+
                 self.__texture_uniforms[uname] = value
                 glUseProgram(p)
-                uset(uname, value.tex)
+                if type(value) is Texture:
+                    if value._active_index is None:
+                        raise ValueError("Texture is not active, can not set uniform")
+                    uset(uname, value._active_index)
+                elif type(value) is int:
+                    uset(uname, value)
                 glUseProgram(0)
 
             return property(fset=set_from_texture)
+        elif _type in (int, float, bool):  # todo make robust
+            def set_uniform(_, value):
+                glUseProgram(p)
+                uset(uname, value)
+                glUseProgram(0)
+        else:
+            def set_uniform(_, value):  # more then one value
 
-        # print("setd:", _type)
-        def set_uniform(_, value):
-            glUseProgram(p)
-            uset(uname, value)
-            glUseProgram(0)
-
-        def get_uniform(self, value):
-            uget(uname, value)
-
+                glUseProgram(p)
+                uset(uname, *value)
+                glUseProgram(0)
         return property(fset=set_uniform)
 
 
@@ -755,4 +990,3 @@ def hw_flip():
     glVertex2f(1, 1)
     glEnd()
     glDisable(GL_TEXTURE_2D)
-    # pygame.display.flip()
