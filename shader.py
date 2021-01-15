@@ -219,10 +219,11 @@ class Texture:
         if not rect:
             rect = (0, 0, self.width, self.height)
         glViewport(rect[0], rect[1], rect[2], rect[3])
-        glActiveTexture(GL_TEXTURE0)
+        #glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.tex)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glEnable(GL_TEXTURE_2D)
+        glDisable(GL_DEPTH_TEST)
 
         glBegin(GL_QUADS)
         glTexCoord2f(0, 0)
@@ -968,7 +969,7 @@ def hw_flip():
     glViewport(0, 0, surface_rect.width, surface_rect.height)
     rgb_surface = pygame.image.tostring(surface, 'RGB')
     glUseProgram(0)
-    glActiveTexture(GL_TEXTURE0)
+    #glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, 0)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
@@ -978,6 +979,7 @@ def hw_flip():
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface_rect.width, surface_rect.height, 0, GL_RGB, GL_UNSIGNED_BYTE,
                  rgb_surface)
     glEnable(GL_TEXTURE_2D)
+    glDisable(GL_DEPTH_TEST)
 
     glBegin(GL_QUADS)
     glTexCoord2f(0, 0)

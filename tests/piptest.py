@@ -22,10 +22,12 @@ class MyVertex(ShaderVertex):
         ShaderVertex.__init__(self, Vao())
         self.vetex = Attribute(g.vec3, 0)
         self.frag = Attribute(g.vec2, 1)
+        self.normals = Attribute(g.vec2, 2)
         self.iTime = Uniform(float)
         self.projectionmatrix = Uniform(g.mat4)
         self.trans = Uniform(g.mat4)
         self.fragcoord = GlslVariable(g.vec2, piping="out")
+        #self.fragnormal = GlslVariable(g.vec3, piping="out")
         self.vertex_buffer = Vbo()
         self.frag_buffer = Vbo()
         self.ebo = Ebo()
@@ -105,10 +107,16 @@ class MyVertex(ShaderVertex):
                           0.5, -0.5, -0.5,
                           0.5, -0.5, 0.5
                           ], np.float32)
+        b = load_obj("bunny.obj")
+        bunny = np.array(b,  np.float32)
 
-        self.ebo.set_data(ebodata, dimensions=2)
-        self.vertex_buffer.set_data(vdata, dimensions=3)
-        self.frag_buffer.set_data(tdata, dimensions=3)
+        #self.ebo.set_data(ebodata, dimensions=2)
+        #self.vertex_buffer.set_data(vdata, dimensions=3)
+        #self.frag_buffer.set_data(tdata, dimensions=3)
+
+        self.ebo.set_data(np.array([i for i in range(len(b))],  np.uintc), dimensions=2)
+        self.vertex_buffer.set_data(bunny, dimensions=3)
+        self.frag_buffer.set_data(np.array([1 for i in range(2*len(b))],  np.uintc), dimensions=2)
 
         self.vao[0] = self.vertex_buffer
         self.vao[1] = self.frag_buffer
@@ -146,8 +154,38 @@ class MyShader(ShaderFragment):
         de: float = abs(g.dot(p, g.vec2(g.cos(self.iTime), g.sin(self.iTime))))
         gl_FragColor = g.vec4(g.vec3(de), 1.0)
         gl_FragColor = g.texture2D(self.textureObj, self.fragcoord)
-        gl_FragColor = g.vec4(self.fragcoord, 0, 0)
+        gl_FragColor = g.vec4(self.fragcoord, 1, 0)
         # gl_FragColor.r = (g.sin(self.iTime)+1)/2
+
+def load_obj(file):
+    v = []
+    vn = []
+    f = []
+    with open(file, "r") as fi:
+        for l in fi.readlines():
+
+            if l.startswith("v "):
+                fu, x, y, z = l.split(" ")
+                v.append((float(x), float(y), float(z)))
+            elif l.startswith("vn "):
+                fu, x, y, z = l.split(" ")
+                vn.append((float(x), float(y), float(z)))
+            elif l.startswith("f "):
+                fu, x, y, z = l.split(" ")
+                x = x.split("//")
+                y = y.split("//")
+                z = z.split("//")
+                f.append(((x[0], x[1]),
+                          (y[0], y[1]),
+                          (z[0], z[1])))
+        s = []
+        for i in f:
+            for j in i:
+                s.append(v[int(j[0])-1])
+
+    #print(v, vn, f)
+    return s
+
 
 
 def main():
@@ -155,13 +193,13 @@ def main():
     window = pygame.display.set_mode((640, 480), HWSURFACE | OPENGL | DOUBLEBUF)
     img = pygame.image.load("alien1.jpg")
     # img = pygame.transform.scale(img)
-    output = Texture()
-    output.tex = 0
-    output.set_surface(window)
-    #output = Texture.from_size((640, 480), internal_format=ss.GL_RGBA)
+    #output = Texture()
     #output.tex = 0
-    output.width = 480
-    output.height = 640
+    #output.set_surface(window)
+    output = Texture.from_size((640, 480), internal_format=ss.GL_RGBA)
+    #output.tex = 0
+    #output.width = 480
+   # output.height = 640
     depth = Texture.from_size((640, 480), internal_format=GL_DEPTH_COMPONENT)
     t = Texture.from_surface(img)
     t.set_active(1)
@@ -169,9 +207,9 @@ def main():
     p = Program()
     p.debug = True
     p.options.DEPTH_TEST = True
-    p.options.ALPHA_TEST = False
+    #p.options.ALPHA_TEST = False
     p.options.DepthMask = True
-    p.options.ClearDepth = 0.5
+    #p.options.ClearDepth = 0.5
     p.options.DepthFunc = ss.GL_ALWAYS
     s = MyShader(output)
     v = MyVertex()
@@ -196,15 +234,13 @@ def main():
     while running:
         p.options.DEPTH_TEST = True
         p.options.DepthMask = True
-        p.options.DepthFunc = ss.GL_ALWAYS
+        p.options.DepthFunc = ss.GL_LEQUAL
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == KEYDOWN:
                 # tr = glm.translate(tr, (-1, -1, 0))
 
-                print(tr)
-                print()
                 if event.key == K_w:
                     tr = glm.translate(tr, (0, 0.01, 0))
                 elif event.key == K_s:
@@ -241,9 +277,12 @@ def main():
         #p.options.DepthMask = False
         if pygame.key.get_pressed()[K_SPACE]:
             depth.draw_top()
+        else:
+            output.draw_top()
         #p.options.DepthMask = False
         pygame.display.flip()
-        p.options.DepthMask = True
+        #p.options.DepthMask = True
+
         p.clear()
         clock.tick(30)
         #p.cleard()

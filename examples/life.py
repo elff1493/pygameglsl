@@ -46,7 +46,8 @@ for x in range(window.get_width()):
         window.set_at((x, y), (r, r, r))
 
 # setup shader stuff
-output = Texture(window, filter=NEAREST)
+output = Texture.from_surface(window)
+output.set_filter(NEAREST)
 output2 = output
 output2.set_active(1)
 my_shader = MyShader(output)
