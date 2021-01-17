@@ -262,6 +262,7 @@ def main():
                     rot = glm.rotate(rot, 0.1, (0, 1, 0))
                 elif event.key == K_DOWN:
                     rot = glm.rotate(rot, -0.1, (0, 1, 0))
+        rot = glm.rotate(rot, 0.1, (0, 1, 0))
 
         s.iTime = pygame.time.get_ticks() / 1000
         v.trans = (tr * rot).to_list()

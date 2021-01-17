@@ -338,7 +338,7 @@ _uniform_types_set = {
         _gl.sampler2D: glUniform1i,
         float: glUniform1f,
         _gl.vec2: glUniform2f,
-        _gl.vec3: glUniform3f,
+        _gl.vec3: lambda n, v :glUniform3f(n, v[0], v[1], v[2]),
         _gl.vec4: glUniform4f,
         int: glUniform1i,
         _gl.ivec2: glUniform2i,
@@ -381,6 +381,11 @@ class ShaderVertex:
     def __init__(self, vao):
         self.vao = vao
 
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "vertex")
+
     def set_vao(self, vao: Vao):
         self.vao = vao
 
@@ -412,23 +417,10 @@ class ShaderFragment:
         self._texture = texture
         self.program = None
 
-    @property
-    def texture(self):
-        """can use before .compile"""
-        return self.program._target_c
-
-    @texture.setter
-    def texture(self, t):
-        self.program._target_c = t
-
-    #def compile(self):
-        #p = Program()
-        #p.fragment = self
-        #p._target_c = self._texture
-        #p.compile()
-
-    def render(self):
-        self.program.render()
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "fragment")
 
     def _get_data(self):
         glvar = [getattr(self, i) for i in dir(self) if isinstance(getattr(self, i), GlslVariable)]
@@ -606,7 +598,7 @@ class Program:
             temp = self.vertex._get_data()
             compiler.vertex = ((None,), u, temp[0], temp[1], a)
 
-        if self.geometry.__class__ is not ShaderDefault:
+        if self.geometry.__class__ is not ShaderDefault: #todo implemen
             raise Exception("not supported yet")
 
         if self.tess_control.__class__ is not ShaderDefault:
@@ -961,6 +953,11 @@ void main()
                 uset(uname, *value)
                 glUseProgram(0)
         return property(fset=set_uniform)
+
+
+class FrameBuffer:
+    def __init__(self):
+        pass #todo implament and intagrate
 
 
 def hw_flip():
