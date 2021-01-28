@@ -137,6 +137,9 @@ class Ops:
         raise TypeError(str(node.__class__.__name__))
         # return node.__class__.__name__
 
+    def Starred(self, node): # todo opengl will do it its self in some place but i will need to add custom logic where it cant
+        return self.call(node.value)
+
     def Store(self, node):
         return ""
 
@@ -465,7 +468,8 @@ class Ops:
         "With": With,
         "DictComp": DictComp,
         "ExceptHandler": ExceptHandler,
-        "FormattedValue": FormattedValue
+        "FormattedValue": FormattedValue,
+        "Starred": Starred
         # todo add all
         # [<class 'ast.Ellipsis'>, <class '_ast.Expression'>,
         # <class '_ast.ExtSlice'>, <class '_ast.FloorDiv'>,
@@ -482,7 +486,7 @@ class Ops:
         # <class '_ast.Pow'>, <class '_ast.RShift'>,
         # <class '_ast.Raise'>, <class '_ast.Set'>,
         # <class '_ast.SetComp'>, <class '_ast.Slice'>,
-        # <class '_ast.Starred'>, <class 'ast.Str'>,
+        # <class '_ast.Starred'>, <class 'ast.Str'>, done
         # <class '_ast.Suite'>, <class '_ast.Try'>,
         # <class '_ast.Tuple'>, <class '_ast.TypeIgnore'>,
         # <class '_ast.UAdd'>, <class '_ast.YieldFrom'>,

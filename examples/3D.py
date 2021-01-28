@@ -1,8 +1,7 @@
 import pygame
 from pygame.locals import *
 
-from shader import fragment, Uniform, Texture, ShaderFragment, ShaderVertex, Vao, Program, Attribute, Vbo, \
-    vertex, GlslVariable, Ebo, GL_DEPTH_COMPONENT
+from shader import Uniform, Texture, ShaderFragment, ShaderVertex, Vao, Program, Attribute, Vbo, GlslVariable, Ebo, GL_DEPTH_COMPONENT
 import shader as ss
 from glsl.v1_10 import sampler2D
 from glsl import v1_10 as g
@@ -21,16 +20,16 @@ def make_matrix(near, far):
 class MyVertex(ShaderVertex):
     def __init__(self):
         ShaderVertex.__init__(self, Vao())
-        self.vetex = Attribute(g.vec3, 0)
-        self.frag = Attribute(g.vec2, 1)
-        self.normal = Attribute(g.vec3, 2)
-        self.iTime = Uniform(float)
+        self.vetex = Attribute[g.vec3](g.vec3, 0)
+        self.frag = Attribute[g.vec2](g.vec2, 1)
+        self.normal = Attribute[g.vec3](g.vec3, 2)
+        #self.iTime = Uniform(float)
         self.projectionmatrix = Uniform(g.mat4)
         self.trans = Uniform(g.mat4)
-        self.fragcoord = GlslVariable(g.vec2, piping="out")
-        self.pixlenormal = GlslVariable(g.vec3, piping="out")
-        self.tolight = GlslVariable(g.vec3, piping="out")
-        self.lightp = Uniform(g.vec3)
+        self.fragcoord = GlslVariable[g.vec2](g.vec2, piping="out")
+        self.pixlenormal = GlslVariable[g.vec3](g.vec3, piping="out")
+        self.tolight = GlslVariable[g.vec3](g.vec3, piping="out")
+        self.lightp = Uniform[g.vec3](g.vec3)
         #self.fragnormal = GlslVariable(g.vec3, piping="out")
         self.vertex_buffer = Vbo()
         self.frag_buffer = Vbo()
@@ -55,22 +54,22 @@ class MyVertex(ShaderVertex):
 
     @ShaderVertex.function
     def main(self):
-        self.fragcoord = self.frag
-        p: g.vec4 = g.vec4(self.vetex, 1) * self.trans
-        self.pixlenormal = (g.vec4(self.normal, 0) * p).xyz
-        self.tolight = (g.vec4(self.lightp, 0) * p).xyz
-        gl_Position = p * self.projectionmatrix
+        self.fragcoord = g.vec2(*self.frag)
+        p: g.vec4 = g.vec4(*self.vetex, 1) * self.trans
+        self.pixlenormal = (g.vec4(*self.normal, 0) * p).xyz
+        self.tolight = (g.vec4(*self.lightp, 0) * p).xyz
+        self.gl_Position = p * self.projectionmatrix
 
 
 class MyShader(ShaderFragment):
     def __init__(self, t):
         ShaderFragment.__init__(self, t)
-        self.iTime: float = Uniform(float)
-        self.textureObj = Uniform(sampler2D)
-        self.iResolution = Uniform(g.vec3)
-        self.fragcoord = GlslVariable(g.vec2, piping="in")
-        self.pixlenormal = GlslVariable(g.vec3, piping="in")
-        self.tolight = GlslVariable(g.vec3, piping="in")
+        #self.iTime = Uniform[float](float)
+        self.textureObj = Uniform[sampler2D](sampler2D)
+        self.iResolution = Uniform[g.vec3](g.vec3)
+        self.fragcoord = GlslVariable[g.vec2](g.vec2, piping="in")
+        self.pixlenormal = GlslVariable[g.vec3](g.vec3, piping="in")
+        self.tolight: g.vec3 = GlslVariable[g.vec3](g.vec3, piping="in")
 
     @ShaderFragment.function
     def main(self):

@@ -4,7 +4,7 @@ import pygame
 import numpy
 import numpy as np
 import ctypes
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Union
 from decomp import Recompiler
 import glsl as _gl
 from glsl import v1_10 as _v1_10
@@ -22,91 +22,14 @@ from glsl import v4_60 as _v4_60
 import glsl as _glsl
 import sys
 
+from gl_types import *
+from buffers import *
 
 NEAREST = GL_NEAREST
 LINEAR = GL_LINEAR
 GL_DEPTH_COMPONENT = GL_DEPTH_COMPONENT
 clear = glClear
 colorb = GL_COLOR_BUFFER_BIT
-
-class GlslArrayProxy:
-    def __init__(self, name):
-        self.name = name
-        self.id = 0
-
-    def set(self, x):
-        pass
-
-    def get(self):
-        pass
-
-
-class Attribute:
-    def __init__(self, _type, index):  # think of better name that dosnt shadow biltin or in
-        self.type = _type
-        self.index = index
-        self.name = ""
-        self._id = None
-
-    def set_index(self, index):
-        self.index = index
-
-
-    def set(self, name):
-        self.name = name
-        return self
-
-
-IN = "in"
-OUT = "out"
-INOUT = "inout"
-GLOBAL = "global"
-AUTO = "auto"
-
-
-class GlslVariable:
-    def __init__(self, _type, piping=AUTO):
-        self.type = _type
-        self.inout = piping
-        self.name = ""
-
-    def set(self, name):
-        self.name = name
-        return self
-
-
-class Constant:  # todo
-    def __init__(self, _type, value):
-        self.value = value
-        self.type = _type
-        self.name = ""
-
-
-T = TypeVar("T", _gl.all_types, int)
-
-
-class Uniform(Generic[T]):
-    def __init__(self, _type, value=None):  # think of better name that dosnt shadow biltin or in
-        self.value = value
-        self.type = _type
-        self.name = ""
-
-    def set(self, name):
-        self.name = name
-        return self
-
-    def set_type(self, t):
-        self.type = t
-
-
-class GlslFuntion:
-    def __init__(self, f, shader="all"):
-        self.shader = [shader]
-        self.callback = f
-        self.glsl = ""
-
-    def __call__(self, *args, **kwargs):
-        return self.callback(*args, **kwargs)
 
 
 def vertex(f):
@@ -178,13 +101,11 @@ class Texture:
     @classmethod
     def new_depth(cls):
         t = Texture()
-        t.set_surface(surface)
         return t
 
     @classmethod
     def from_empty(cls):
         t = Texture()
-        t.set_surface(surface)
         return t
 
     def set_filter(self, filter_type):  # todo seter ang geters/ per min/mag
@@ -255,83 +176,6 @@ class Texture:
         self._active_index = index
 
 
-class Vao:
-    def __init__(self):
-        self._id = glGenVertexArrays(1)
-        #self.normalized = False
-        self.__vbo = {}
-
-    def __setitem__(self, key, value):
-        # test if vbo, ibo...
-        self.__vbo[key] = value
-        glBindVertexArray(self._id)
-        glBindBuffer(GL_ARRAY_BUFFER, value._id)
-        glVertexAttribPointer(key, value.dimensions, value.type, value.normalised, 0, ctypes.c_void_p(0))
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-
-    def __getitem__(self, item):
-        return self.__vbo[item]
-
-    def enable(self, index):
-        glBindVertexArray(self._id)
-        glEnableVertexAttribArray(index)
-        glBindVertexArray(0)
-
-    def disable(self, index):
-        glBindVertexArray(self._id)
-        glDisableVertexAttribArray(index)
-        glBindVertexArray(0)
-
-
-class Vbo:
-    buffert = GL_ARRAY_BUFFER
-    _types = {#ints
-            np.byte: GL_BYTE,
-            np.ubyte: GL_UNSIGNED_BYTE,
-            np.short: GL_SHORT,
-            np.ushort: GL_UNSIGNED_SHORT,
-            np.intc: GL_INT,
-            np.uintc: GL_UNSIGNED_INT,
-            # floats
-            np.float16: GL_HALF_FLOAT,
-            np.float32: GL_FLOAT,
-            np.float64: GL_DOUBLE
-
-        #GL_FLOAT, GL_DOUBLE, GL_FIXED
-
-              }
-
-    def __init__(self):
-        self._id = glGenBuffers(1)
-        self.dimensions = None
-        self.len = 0
-        self.type = GL_INT
-        self.normalised = False
-
-    def set_data(self, data: numpy.array, _type=GL_DYNAMIC_DRAW, dimensions=None):
-        size = data.nbytes
-        s = data.shape
-        self.len = s[0]
-        self.type = Vbo._types[data.dtype.type]
-
-        if len(s) > 2:
-            raise Exception("invalid array shape")
-        if len(s) >= 1:
-            if not dimensions:
-                self.dimensions = s[1]
-            else:
-                self.dimensions = dimensions
-            data = data.flatten()
-        b = self.__class__.buffert
-        glBindBuffer(b, self._id)
-        glBufferData(b, size, data, _type)
-        glBindBuffer(b, 0)
-
-
-class Ebo(Vbo):  # todo add check for  array type ( it isnt the same as vbo)
-    buffert = GL_ELEMENT_ARRAY_BUFFER
-
 
 _uniform_types_set = {
         Texture: glUniform1i,
@@ -361,25 +205,35 @@ _uniform_types_set = {
 
 
 class ShaderCompute:
-    pass
+    def __init__(self):
+        pass
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "vertex")
 
+    def run(self):
+        pass
 
 class ShaderTessEvaluation:
-    pass
-
+    def __init__(self):
+        self.program: Program = None
 
 class ShaderTessControl:
-    pass
+    def __init__(self):
+        self.program: Program = None
 
 
 class ShaderGeometry:
     def __init__(self, max_vertices, in_type, out_type):
+        self.program: Program = None
         self._translation = (max_vertices, in_type, out_type)
 
 
 class ShaderVertex:
     def __init__(self, vao):
         self.vao = vao
+        self.program: Program = None
 
     @classmethod
     def function(cls, f):
@@ -415,7 +269,7 @@ class ShaderFragment:
 
     def __init__(self, texture: Texture):
         self._texture = texture
-        self.program = None
+        self.program: Program = None
 
     @classmethod
     def function(cls, f):
@@ -446,11 +300,11 @@ class Program:
         self._target_d = None
         self._target_s = None
 
-        self.fragment = ShaderDefault()
-        self.geometry = ShaderDefault()
-        self.vertex = ShaderDefault()
-        self.tess_evaluation = ShaderDefault()
-        self.tess_control = ShaderDefault()
+        self.fragment: Union[ShaderFragment, None] = None
+        self.geometry: Union[ShaderGeometry, None] = None
+        self.vertex: Union[ShaderVertex, None] = None
+        self.tess_evaluation: Union[ShaderTessEvaluation, None ] = None
+        self.tess_control: Union[ShaderTessControl, None] = None
         # cant use compute shader in this pipline, it has its own pipline
         self.options = Options()
         self.debug = False
@@ -550,7 +404,7 @@ class Program:
                    self.geometry,
                    self.tess_control,
                    self.tess_evaluation]
-        shader_obs = [i for i in shader_obs if i.__class__ is not ShaderDefault]
+        shader_obs = [i for i in shader_obs if i is not None]
 
         # get uniforms, Attributes, piping varables, can be defined in any shader
         uniforms = {}
@@ -567,7 +421,7 @@ class Program:
                 if isinstance(getattr(ob, i), Uniform):
                     uniforms[i] = getattr(ob, i).set(i)
             # find what modual was used for this shader
-            # this is needed so glsl works right
+            # this is needed so glsl works right with "as" imports
             m = sys.modules[ob.__module__]
             for i in dir(m):
                 if getattr(m, i) in (_gl, _glsl, _v1_10, _v1_20,
@@ -591,20 +445,20 @@ class Program:
         u = [(j.value, j.type, j.name) for j in
              uniforms]
         a = [(j.type, j.name) for j in attribute]  # todo remove dependancy
-        if self.fragment.__class__ is not ShaderDefault:  # todo tidy up
+        if self.fragment is not None:  # todo tidy up
             temp = self.fragment._get_data()  # gets (glslvar, funtions)
             compiler.fragment = ((None,), u, temp[0], temp[1], None)
-        if self.vertex.__class__ is not ShaderDefault:
+        if self.vertex is not None:
             temp = self.vertex._get_data()
             compiler.vertex = ((None,), u, temp[0], temp[1], a)
 
-        if self.geometry.__class__ is not ShaderDefault: #todo implemen
+        if self.geometry is not None: #todo implemen
             raise Exception("not supported yet")
 
-        if self.tess_control.__class__ is not ShaderDefault:
+        if self.tess_control is not None:
             raise Exception("not supported yet")
 
-        if self.tess_evaluation.__class__ is not ShaderDefault:
+        if self.tess_evaluation is not None:
             raise Exception("not supported yet")
 
         # todo geomrtry
@@ -713,6 +567,7 @@ class Program:
 
         return property(fset=set_uniform, fget=get_uniform)
 # todo test multipul shaders
+
 
 class Options:
     def __init__(self):
@@ -953,11 +808,6 @@ void main()
                 uset(uname, *value)
                 glUseProgram(0)
         return property(fset=set_uniform)
-
-
-class FrameBuffer:
-    def __init__(self):
-        pass #todo implament and intagrate
 
 
 def hw_flip():

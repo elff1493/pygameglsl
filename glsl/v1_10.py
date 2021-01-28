@@ -1,10 +1,14 @@
-from typing import TypeVar, Union
+from typing import TypeVar, Union, Generic, SupportsInt, SupportsFloat
+from collections import Iterable
 
 
-class vec2:
-    def __init__(self, x: float, y: float = "x"):
+class vec2(Iterable):
+    y = 0
+    def __init__(self, x: float, y: float = "fills"):
+
         self.x: float = x
-        self.y: float = y
+
+        #self.y: float = y
 
     def __truediv__(self, other): ...
 
@@ -15,35 +19,41 @@ class vec2:
     def __rmul__(self, other) -> "vec2": ...
 
 
-class vec3:
+#vec2.__annotations__["y"] = float
+#vec2.__dict__["y"] = 0.0
+
+class vec3(Iterable):
     def __init__(self, x: float, y: float, z: float): ...
 
 
-class vec4:
-    def __init__(self, r: float, g: float, b: float, a: float): ...
+class vec4(Iterable):
+    def __init__(self, r: float, g: float = "fills", b: float = "fills", a: float = "fills"): ...
+
+    def __rmul__(self, other) -> "vec4": ...
+    def __mul__(self, other) -> "vec4": ...
 
 
-class bvec2:
+class bvec2(Iterable):
     def __init__(self, x: bool, y: bool): ...
 
 
-class bvec3:
+class bvec3(Iterable):
     def __init__(self, x: bool, y: bool, z: bool): ...
 
 
-class bvec4:
+class bvec4(Iterable):
     def __init__(self, r: bool, g: bool, b: bool, a: bool): ...
 
 
-class ivec2:
+class ivec2(Iterable):
     def __init__(self, x: int, y: int): ...
 
 
-class ivec3:
+class ivec3(Iterable):
     def __init__(self, x: int, y: int, z: int): ...
 
 
-class ivec4:
+class ivec4(Iterable):
     def __init__(self, r: int, g: int, b: int, a: int): ...
 
 
@@ -89,7 +99,8 @@ mat = Union[mat2, mat3, mat4]
 vec = Union[vec2, vec3, vec4]
 ivec = Union[ivec2, ivec3, ivec4]
 bvec = Union[bvec2, bvec3, bvec4]
-GenType = Union[int, float, vec, ivec]  # mat to? # todo
+
+GenType = TypeVar("GenType", int, float, vec, ivec)  # mat to? # todo
 all_types = Union[GenType, vec, bvec, mat, sampler1D, sampler2D]  # todo add all
 
 
