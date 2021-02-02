@@ -1,13 +1,14 @@
 import pygame
 from pygame.locals import *
 
-from shader import Shader, fragment, Uniform, hw_flip, Texture
+from shader import Shader, fragment, Uniform, hw_flip, Texture, GlslVariable, IN
 import glsl as g
 
 
 class MyShader(Shader):
     def __init__(self, t):
         Shader.__init__(self, t)
+        self.fragCoord = GlslVariable(g.vec2, piping=IN)
         self.zoom = Uniform(float)
         self.zoom_pos = Uniform(g.vec2)
 

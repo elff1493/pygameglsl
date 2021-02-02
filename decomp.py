@@ -2,11 +2,6 @@ import ast
 from inspect import getsource, getfile
 from textwrap import dedent, indent
 
-
-# print(_gl, "ob")
-class vec2: ...
-
-
 v = """
 #version 120
 
@@ -19,17 +14,6 @@ void main()
     gl_Position = vec4(vPosition.x, vPosition.y, 0.0, 1.0);
     fragCoord = vTexcoords;
 }
-"""
-f = """
-#version 120
-
-varying vec2 fTexcoords;
-uniform sampler2D textureObj;
-uniform vec3 iResolution;
-uniform float iTime;
-
-%s
-
 """
 
 
@@ -65,14 +49,14 @@ def str_node(node):
 
 
 # todo add all ops
-# todo fix brackets (1+2)*3 is the same as 1+(2*3)
+# todo redundant brackets
 # todo custom line funtion to input raw glsl
 # todo uniforms, atrabutes, varing, constants
 # todo alasis for names. so something like "gl_FragColor" can be renamed to "output colour
-# todo funtions
+# done
 # todo structs
 # todo type testing so type hints can be minimsed
-
+# todo unpacking
 class Ops:
     def __init__(self, _globals):
         self.globals = _globals
@@ -95,7 +79,7 @@ class Ops:
         return "%s %s= %s" % (self.call(node.target), self.call(node.op), self.re_expression(node.value))
 
     def Constant(self, node):
-        return str(node.value)  # todo test if sting or invaild
+        return str(node.value)
 
     def Div(self, node):
         return "/"
@@ -115,7 +99,7 @@ class Ops:
     def Call(self, node):
         return "%s(%s)" % (self.call(node.func), self.unpack(node))
 
-    def Assign(self, node):  # todo unpacking
+    def Assign(self, node):
         if len(node.targets) > 1:
             raise Exception("unpacking not supported yet")
         return "%s = %s" % (self.call(node.targets[0]), self.call(node.value))
@@ -151,7 +135,10 @@ class Ops:
         if node.__class__.__name__ in Ops.calls:
             return Ops.calls[node.__class__.__name__](self, node)
         raise TypeError(str(node.__class__.__name__))
-        #return node.__class__.__name__
+        # return node.__class__.__name__
+
+    def Starred(self, node): # todo opengl will do it its self in some place but i will need to add custom logic where it cant
+        return self.call(node.value)
 
     def Store(self, node):
         return ""
@@ -161,9 +148,7 @@ class Ops:
             return "mod(%s, %s)" % (self.call(node.left), self.call(node.right))
         elif node.op.__class__.__name__ == "Pow":
             return "pow(%s, %s)" % (self.call(node.left), self.call(node.right))
-        return self.call(node.left) \
-               + self.call(node.op) \
-               + self.call(node.right)
+        return "(" + self.call(node.left) + self.call(node.op) + self.call(node.right) + ")"
 
     def Load(self, node):
         return ""
@@ -187,12 +172,12 @@ class Ops:
         body_else = ""
         if node.orelse:
             body_else = " else {\n%s} " % self.re_body(node.orelse)
-        return "if (%s)\n{\n %s}%s" % (name, body, body_else)  # todo add else
+        return "if (%s)\n{\n %s}%s\n" % (name, body, body_else)  # todo test else
 
     def Expr(self, node):
         return self.re_expression(node)
 
-    def For(self, node):  # todo float step, for each, neg step
+    def For(self, node):  # todo for each, neg step
         t = "int"
         name = self.call(node.target)
         args = node.iter.args
@@ -204,11 +189,17 @@ class Ops:
         elif len(args) == 2:
             start = self.call(args[0])
             end = self.call(args[1])
+        elif len(args) == 3:
+            start = self.call(args[0])
+            end = self.call(args[1])
+            step = self.call(args[2])
         else:
-            pass
+            raise Exception("to many arguments to range")
 
+        if not all((float(start).is_integer(), float(end).is_integer(), float(step).is_integer())):
+            t = "float"
         body = self.re_body(node.body)
-        f = f"for ({t} {name}={start};i<{end};{name}+={step}){{\n{body}\n}}"
+        f = f"for ({t} {name}={start};{name}<{end};{name}+={step}){{\n{body}\n}}"
         return f
 
     def UnaryOp(self, node):
@@ -232,11 +223,11 @@ class Ops:
     def And(self, node):
         return " && "
 
-    def BoolOp(self, node): # todo test
+    def BoolOp(self, node):
         op = self.call(node.op)
-        #return "this one"
-        return self.call(node.values[0]) + op + self.call(node.values[1])
-        return op.join([self.call(i) for i in node.values])
+        # return "this one"
+        return "(" + self.call(node.values[0]) + op + self.call(node.values[1]) + ")"
+        # return op.join([self.call(i) for i in node.values])
 
     def Subscript(self, node):
         return self.call(node.value) + "[" + self.call(node.slice) + "]"
@@ -279,7 +270,7 @@ class Ops:
 
     def IsNot(self, node):
         self.errors.append("is not is not supported, defulted to !=")
-        return " == "
+        return " != "
 
     def In(self, node):
         self.errors.append("In is not supported")
@@ -302,7 +293,7 @@ class Ops:
 
     def FunctionDef(self, node):
         self.errors.append("nested functions are not supported")
-        #assert 1==2
+        # assert 1==2
         return ""
 
     def Global(self, node):
@@ -313,6 +304,7 @@ class Ops:
         return "!"
 
     def AST(self, node):
+        self.errors.append("howd you get the bace class :/")
         print("howd you get the bace class :/")
         return ""
 
@@ -360,7 +352,7 @@ class Ops:
         self.errors.append("with is not supported in shader")
         return ""
 
-    def unaryop(self, node): # todo add unaryop
+    def unaryop(self, node):  # todo add unaryop
         self.errors.append("unaryop is not supported in shader")
         return ""
 
@@ -408,9 +400,9 @@ class Ops:
         "Not": Not,
         "Global": Global,
         "FunctionDef": FunctionDef,
-        "Continue":Continue,
+        "Continue": Continue,
         "Dict": Dict,
-        "Compare":Compare,
+        "Compare": Compare,
         "BitXor": BitXor,
         "BitOr": BitOr,
         "BitAnd": BitAnd,
@@ -445,7 +437,6 @@ class Ops:
         "Attribute": Attribute,
         "Return": Return,
 
-
         "Eq": Eq,
         "NotEq": NotEq,
         "Lt": Lt,
@@ -477,7 +468,8 @@ class Ops:
         "With": With,
         "DictComp": DictComp,
         "ExceptHandler": ExceptHandler,
-        "FormattedValue": FormattedValue
+        "FormattedValue": FormattedValue,
+        "Starred": Starred
         # todo add all
         # [<class 'ast.Ellipsis'>, <class '_ast.Expression'>,
         # <class '_ast.ExtSlice'>, <class '_ast.FloorDiv'>,
@@ -494,7 +486,7 @@ class Ops:
         # <class '_ast.Pow'>, <class '_ast.RShift'>,
         # <class '_ast.Raise'>, <class '_ast.Set'>,
         # <class '_ast.SetComp'>, <class '_ast.Slice'>,
-        # <class '_ast.Starred'>, <class 'ast.Str'>,
+        # <class '_ast.Starred'>, <class 'ast.Str'>, done
         # <class '_ast.Suite'>, <class '_ast.Try'>,
         # <class '_ast.Tuple'>, <class '_ast.TypeIgnore'>,
         # <class '_ast.UAdd'>, <class '_ast.YieldFrom'>,
@@ -506,29 +498,25 @@ class Ops:
         # <class '_ast.mod'>, <class '_ast.slice'>]
     }
 
-#import inspect todo remove when all ast implmented
-#a = dir(ast)
-#a = [getattr(ast, i) for i in a if inspect.isclass(getattr(ast, i))]
-#a = [i for i in a if issubclass(i, ast.AST)]
-#a = [i for i in a if i.__name__ not in Ops.calls.keys()]
-#print(a)
-
-def unindent(s):
-    return s
-
 
 class Recompiler:
     def __init__(self, functions):
-        self.functions = functions
-        self.vertex = ""
-        self.fragment = ""
+        #self.functions = functions
+        # formate (const, uniforms, piping vars, functions, attributes)
+        self.fragment = None
+        self.geometry = None
+        self.vertex = None
+        self.tess_evaluation = None
+        self.tess_control = None
+
+        #self.vertex = ""
+        #self.fragment = ""
         self.debug = False
         self.globals = {}
         self.uniforms = []
         self.attributes = []
-        self.import_as = ""
-        # self.code = get_code(data.__code__) # todo replace with inspects get sorce
-        # self.ast = ast.parse(self.code, type_comments=True)
+        self.import_as = []
+        self.version = 120
 
     def comp_func(self, f):
         func = "{_type} {name} ({args}){{\n{body}}}"
@@ -538,7 +526,7 @@ class Recompiler:
         # print(formate)
         node = ast.parse(formate, type_comments=True)
         op = Ops(self.globals)
-        op.atterl_remove.append(self.import_as)
+        op.atterl_remove.extend(self.import_as)
         out = op.call(node)
         if op.errors:
             print(self._debug_tree(node))
@@ -551,9 +539,9 @@ class Recompiler:
             _type = _type.__name__
         out = func.format(_type=_type, name=f.__name__, args=self.args(t), body=out)
 
-        if self.debug:
-            self._debug_tree(node)
-            print(out)
+        #if self.debug:
+            #self._debug_tree(node)
+            #print(out)
         return out
 
     def args(self, a):
@@ -561,38 +549,86 @@ class Recompiler:
         return "".join([a[i].__name__ + " " + i + ", " for i in a if i != "return"])[:-2]
 
     def _make_fragment(self):
-        out = "#version 120\n"
-        out += "precision highp float;\n"
-        out += "varying vec2 fragCoord;\n"
-        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
-        # print(self.uniforms)
-        func = "".join([i.glsl + "\n" for i in self.functions])
-        out += func
-        self.fragment = out
+        out = "#version " + str(self.version) + "\n"
+        for i in self.fragment[2]:
+            print(i, i.inout)
+            if i.inout in ("auto", "in", "inout"):  # todo add check for later in out syintax
+                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+            elif i.inout in ("out",):
+                if self.version < 130: # todo is right?
+                    out += "#define " + i.name + " gl_FragColor\n"
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.fragment[1]])
+        out += "\n"
+        out += "".join([(self.comp_func(i) + "\n") for i in self.fragment[3]])
         return out
 
     def _make_vertex(self):
-        out = "#version 120\n" # todo custom version
-        out += "precision highp float;\n"
+        out = "#version " + str(self.version) + "\n"
+        for t, n in self.vertex[4]:  # (type, name)
+            out += "attribute " + str(t.__name__) + " " + str(n) + ";\n"
+        for i in self.vertex[2]:
+            if i.inout in ("auto", "out", "inout"):  # todo add check for later in out syintax
+                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.vertex[1]])
+        out += "\n"
+        out += "".join([(self.comp_func(i) + "\n") for i in self.vertex[3]])
+        return out
+
+
+
+
+
+
+        out = "#version " + str(self.version) + "\n"
+        #out += "precision highp float;\n"
         out += "varying vec2 fragCoord;\n"
-        #out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
+        # out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
         # print(self.uniforms)
         func = "".join([i.glsl + "\n" for i in self.functions])
         out += func
-        self.vertex = out
+        #self.vertex = out
+        return out
+
+    def _make_geometry(self):
+        out = "#version " + str(self.version) + "\n"
+        return out
+
+    def _make_tess_control(self):
+        out = "#version " + str(self.version) + "\n"
+        return out
+
+    def _make_tess_evaluation(self):
+        out = "#version " + str(self.version) + "\n"
         return out
 
     def run(self):
 
-        # do uniforms, atrabutes, varing
         # do typing
-        # compile all functions
-        # make vertex and fragment
-        for i in self.functions:
-            i.glsl = self.comp_func(i.callback)
-        self.vertex = v
-        self._make_fragment()
-        #print(out)
+        # piping auto
+
+        out = {}
+        if self.fragment:
+            out["fragment"] = self._make_fragment()
+            if self.debug:
+                print(out["fragment"])
+        if self.geometry:
+            out["geometry"] = self._make_geometry()
+            if self.debug:
+                print(out["geometry"])
+        if self.vertex:
+            out["vertex"] = self._make_vertex()
+            if self.debug:
+                print(out["vertex"])
+        if self.tess_evaluation:
+            out["tess_evaluation"] = self._make_tess_evaluation()
+            if self.debug:
+                print(out["tess_evaluation"])
+        if self.tess_control:
+            out["tess_control"] = self._make_tess_control()
+            if self.debug:
+                print(out["tess_control"])
+
+        return out
 
     def _debug_tree(self, node, level=0):
 
