@@ -3,6 +3,7 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import numpy as np
 
+
 class Vao:
     def __init__(self):
         self._id = glGenVertexArrays(1)
@@ -82,13 +83,30 @@ class Ebo(Vbo):  # todo add check for  array type ( it isnt the same as vbo)
 
 
 class FrameBuffer:
-    def __init__(self):
+    # todo add more of the colors
+    # todo add del, to unbind textures
+    # todo add support from renderbuffers
+    __default_fb = None
+    def __init__(self, color=None, depth=None, stencil=None):
         self._id = glGenFramebuffers(1)
-        self._color = None
-        self._depth = None
-        self._stencil = None
+        self._color = color
+        self._depth = depth
+        self._stencil = stencil
 
-    def is_complete(self):
+    @classmethod
+    def get_default(cls) -> "FrameBuffer":
+        if FrameBuffer.__default_fb:
+            return FrameBuffer.__default_fb
+        else:
+            output = FrameBuffer.__new__(FrameBuffer)
+            output._id = 0
+            output._color = None
+            output._depth = None
+            output._stencil = None
+            FrameBuffer.__default_fb = output
+            return output
+
+    def is_complete(self) -> bool:
         glBindFramebuffer(GL_FRAMEBUFFER, self._id)
         output = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE
         glBindFramebuffer(GL_FRAMEBUFFER, self._id)
@@ -97,6 +115,12 @@ class FrameBuffer:
     @property
     def color(self):
         return self._color
+
+    @color.deleter
+    def color(self):
+        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
 
     @color.setter
     def color(self, tex):
@@ -125,5 +149,15 @@ class FrameBuffer:
         self._stencil = tex
         glBindFramebuffer(GL_FRAMEBUFFER, self._id)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, tex.tex, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+    def _clear(self, mask):
+        glClear(mask)
+
+    def clear(self):
+        self.clear_all()
+
+    def clear_all(self):
+        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)

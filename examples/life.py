@@ -9,9 +9,9 @@ import random
 class MyShader(Shader):
     def __init__(self, t):
         Shader.__init__(self, t)
-        self.texture = Uniform(g.sampler2D)
+        self.texture = Uniform[g.sampler2D]()
         self.size = Uniform(g.vec2)
-        self.fragCoord = GlslVariable(g.vec2, piping=IN)
+        self.fragCoord = GlslVariable[g.vec2](piping=IN)
         self.debug = True
 
     @fragment
@@ -29,7 +29,7 @@ class MyShader(Shader):
         k += self.cell(px + g.ivec2(-1, 1)) + self.cell(px + g.ivec2(0, 1)) + self.cell(px + g.ivec2(1, 1))
         e: int = self.cell(px)
         f: float = float((k == 2 and e == 1) or (k == 3))
-        gl_FragColor = g.vec4(f, f, f, 1.0)
+        self.gl_FragColor = g.vec4(f, f, f, 1.0)
         #gl_FragColor = g.texture2D(self.texture, self.fragCoord.xy)
 
 

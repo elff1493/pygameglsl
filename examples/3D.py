@@ -1,7 +1,8 @@
 import pygame
 from pygame.locals import *
 
-from shader import Uniform, Texture, ShaderFragment, ShaderVertex, Vao, Program, Attribute, Vbo, GlslVariable, Ebo, GL_DEPTH_COMPONENT
+from shader import Uniform, Texture, ShaderFragment, ShaderVertex, Program, Attribute, GlslVariable, GL_DEPTH_COMPONENT
+from buffers import FrameBuffer, Vbo, Vao, Ebo
 import shader as ss
 from glsl.v1_10 import sampler2D
 from glsl import v1_10 as g
@@ -19,17 +20,18 @@ def make_matrix(near, far):
 
 class MyVertex(ShaderVertex):
     def __init__(self):
-        ShaderVertex.__init__(self, Vao())
-        self.vetex = Attribute[g.vec3](g.vec3, 0)
-        self.frag = Attribute[g.vec2](g.vec2, 1)
-        self.normal = Attribute[g.vec3](g.vec3, 2)
+        ShaderVertex.__init__(self)
+
+        self.vetex = Attribute[g.vec3](0)
+        self.frag = Attribute[g.vec2](1)
+        self.normal = Attribute[g.vec3](2)
         #self.iTime = Uniform(float)
-        self.projectionmatrix = Uniform(g.mat4)
-        self.trans = Uniform(g.mat4)
-        self.fragcoord = GlslVariable[g.vec2](g.vec2, piping="out")
-        self.pixlenormal = GlslVariable[g.vec3](g.vec3, piping="out")
-        self.tolight = GlslVariable[g.vec3](g.vec3, piping="out")
-        self.lightp = Uniform[g.vec3](g.vec3)
+        self.projectionmatrix = Uniform[g.mat4]()
+        self.trans = Uniform[g.mat4]()
+        self.fragcoord = GlslVariable[g.vec2](piping="out")
+        self.pixlenormal = GlslVariable[g.vec3](piping="out")
+        self.tolight = GlslVariable[g.vec3](piping="out")
+        self.lightp = Uniform[g.vec3]()
         #self.fragnormal = GlslVariable(g.vec3, piping="out")
         self.vertex_buffer = Vbo()
         self.frag_buffer = Vbo()
@@ -44,6 +46,8 @@ class MyVertex(ShaderVertex):
         self.frag_buffer.set_data(np.array([1 for i in range(2*len(b))],  np.uintc), dimensions=2)
 
         self.normals.set_data(np.array(n, np.float32), dimensions=3)
+
+        self.vao = Vao()
 
         self.vao[0] = self.vertex_buffer
         self.vao[1] = self.frag_buffer
@@ -62,8 +66,8 @@ class MyVertex(ShaderVertex):
 
 
 class MyShader(ShaderFragment):
-    def __init__(self, t):
-        ShaderFragment.__init__(self, t)
+    def __init__(self):
+        ShaderFragment.__init__(self)
         #self.iTime = Uniform[float](float)
         self.textureObj = Uniform[sampler2D](sampler2D)
         self.iResolution = Uniform[g.vec3](g.vec3)
@@ -116,13 +120,17 @@ def main():
     depth = Texture.from_size((640, 480), internal_format=GL_DEPTH_COMPONENT)
 
     p = Program()
+    fb = FrameBuffer()
+    fb.color = output
+    fb.depth = depth
+    p.framebuffer = fb
 
     p.debug = True
     p.options.DEPTH_TEST = True
     p.options.DepthMask = True
     p._target_d = depth
 
-    s = MyShader(output)
+    s = MyShader()
     v = MyVertex()
 
     p.fragment = s
@@ -169,16 +177,16 @@ def main():
                 elif event.key == K_DOWN:
                     rot = glm.rotate(rot, -0.1, (0, 1, 0))
 
-        rot = glm.rotate(rot, 0.1, (0, 0, 1))
+        rot = glm.rotate(rot, 0.05, (0, 0, 1))
 
         v.trans = (tr * rot).to_list()
 
-        p.render_vao_indexed(v.ebo)
+        p.render_vao_indexed(v.vao, v.ebo)
 
         p.options.DEPTH_TEST = False
         output.draw_top()
         pygame.display.flip()
-        p.clear()
+        p.framebuffer.clear()
         clock.tick(30)
     pygame.quit()
 

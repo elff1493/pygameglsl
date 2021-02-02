@@ -18,7 +18,7 @@ _Attribute_types = TypeVar("_Attribute_types")
 
 
 class Attribute(Generic[_Attribute_types]):
-    def __init__(self, _type=None, index=0):  # think of better name that dosnt shadow biltin or in
+    def __init__(self, index=0, _type=None):  # think of better name that dosnt shadow biltin or in
         self.type = _type
         self.index = index
         self.name = ""
