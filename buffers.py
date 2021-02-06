@@ -4,7 +4,7 @@ from OpenGL.GL.shaders import *
 import numpy as np
 
 
-class Vao:
+class Vao: # todo, interleave mecanisem
     def __init__(self):
         self._id = glGenVertexArrays(1)
         #self.normalized = False
@@ -51,26 +51,38 @@ class Vbo:
 
               }
 
-    def __init__(self):
+    def __init__(self): # todo add a get from gpu slicer
         self._id = glGenBuffers(1)
         self.dimensions = None
         self.len = 0
         self.type = GL_INT
+        self._type_size = 1
         self.normalised = False
 
-    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions=None):
+    def __len__(self):
+        return int(self.get_size_bytes() / self._type_size)
+
+    def get_size_bytes(self):
+        glBindBuffer(self.buffert, self._id)
+        output = glGetBufferParameteriv(self.buffert, GL_BUFFER_SIZE)
+        glBindBuffer(self.buffert, 0)
+        return output
+
+    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions:int=None): # todo supportt interleaved data
         size = data.nbytes
         s = data.shape
         self.len = s[0]
         self.type = Vbo._types[data.dtype.type]
+        self._type_size = data.dtype.itemsize
 
         if len(s) > 2:
             raise Exception("invalid array shape")
         if len(s) >= 1:
-            if not dimensions:
-                self.dimensions = s[1]
-            else:
+            if dimensions:
+                self._type_size *= dimensions
                 self.dimensions = dimensions
+            else:
+                self.dimensions = s[1]
             data = data.flatten()
         b = self.__class__.buffert
         glBindBuffer(b, self._id)
@@ -86,7 +98,9 @@ class FrameBuffer:
     # todo add more of the colors
     # todo add del, to unbind textures
     # todo add support from renderbuffers
+
     __default_fb = None
+
     def __init__(self, color=None, depth=None, stencil=None):
         self._id = glGenFramebuffers(1)
         self._color = color

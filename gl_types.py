@@ -2,7 +2,26 @@
 from typing import Generic, TypeVar
 
 
-class GlslArrayProxy:
+class GlslStruct:  # todo custom types # todo let custom types be use in places
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "Struct")
+
+
+class GlslClass:  # todo add proto classes # todo basic class inheritance
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "class")
+
+
+class UniformBlock:  # todo uniform blocks
+    def __init__(self):
+        pass
+
+
+class GlslArrayProxy: #todo add arrays
     def __init__(self, name):
         self.name = name
         self._id = 0
