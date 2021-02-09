@@ -41,10 +41,11 @@ class Attribute(Generic[_Attribute_types]):
         self.type = _type
         self.index = index
         self.name = ""
-        self._id = None
+        self._p_id = None
 
     def set_index(self, index):
         self.index = index
+        #glBindAttribLocation(self._p_id, index, self.name)
 
     def set(self, name):
         self.name = name

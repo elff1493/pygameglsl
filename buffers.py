@@ -1,7 +1,7 @@
-
 from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import numpy as np
+from textures import Texture
 
 
 class Vao: # todo, interleave mecanisem
@@ -11,6 +11,7 @@ class Vao: # todo, interleave mecanisem
         self.__vbo = {}
 
     def __setitem__(self, key, value):
+        """you should enable this index before setting"""
         # test if vbo, ibo...
         self.__vbo[key] = value
         glBindVertexArray(self._id)
@@ -22,6 +23,12 @@ class Vao: # todo, interleave mecanisem
     def __getitem__(self, item):
         return self.__vbo[item]
 
+    def set_divisor(self, index, divisor):
+        """sets the divisor for instanced rendering. set to 0 to disable"""
+        glBindVertexArray(self._id)
+        glVertexAttribDivisor(index, divisor)
+        glBindVertexArray(0)
+
     def enable(self, index):
         glBindVertexArray(self._id)
         glEnableVertexAttribArray(index)
@@ -31,6 +38,18 @@ class Vao: # todo, interleave mecanisem
         glBindVertexArray(self._id)
         glDisableVertexAttribArray(index)
         glBindVertexArray(0)
+
+
+class BufferSegment:
+    def __init__(self, parent):
+        self.parent = parent
+        self.buffert = parent.buffert
+        self.type = GL_INT
+
+    @classmethod
+    def interleaved(cls, parent, types) -> "BufferSegment":
+        """""" #todo implement
+
 
 
 class Vbo:
@@ -68,7 +87,13 @@ class Vbo:
         glBindBuffer(self.buffert, 0)
         return output
 
-    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions:int=None): # todo supportt interleaved data
+    def unpack_as(self, types):
+        pass
+
+    def unpack_range(self):
+        pass
+
+    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions:  int=None): # todo supportt interleaved data
         size = data.nbytes
         s = data.shape
         self.len = s[0]
@@ -114,11 +139,22 @@ class FrameBuffer:
         else:
             output = FrameBuffer.__new__(FrameBuffer)
             output._id = 0
-            output._color = None
+            output._color = Texture.get_default()
             output._depth = None
             output._stencil = None
             FrameBuffer.__default_fb = output
             return output
+
+    def blit(self, other: "FrameBuffer",
+             source_rect=None, dest_rect=None,
+             mask=GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT, filter=GL_LINEAR):
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, other._id)
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._id)
+        if not source_rect:
+            source_rect = 0, 0, other.color.width, other.color.height
+        if not dest_rect:
+            dest_rect = 0, 0, self.color.width, self.color.height
+        glBlitFramebuffer(*source_rect, *dest_rect, mask, filter)
 
     def is_complete(self) -> bool:
         glBindFramebuffer(GL_FRAMEBUFFER, self._id)
