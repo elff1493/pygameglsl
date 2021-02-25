@@ -1,8 +1,9 @@
 import pygame
 from pygame.locals import *
 
-from shader import Uniform, Texture, ShaderFragment, ShaderVertex, Program, Attribute, GlslVariable, GL_DEPTH_COMPONENT, GL_COLOR_BUFFER_BIT
+from shader import Uniform,  ShaderFragment, ShaderVertex, Program, Attribute, GlslVariable, GL_DEPTH_COMPONENT, GL_COLOR_BUFFER_BIT
 from buffers import FrameBuffer, Vbo, Vao, Ebo
+from textures import Texture, RenderBuffer
 import shader as ss
 from glsl.v1_10 import sampler2D
 from glsl import v1_10 as g
@@ -126,12 +127,15 @@ def load_obj(file):
 
 def main():
     pygame.init()
-    window = pygame.display.set_mode((640, 480), HWSURFACE | OPENGL | DOUBLEBUF)
+    size = (640, 480)
+    size = (1000, 1000)
+    window = pygame.display.set_mode(size, HWSURFACE | OPENGL | DOUBLEBUF)
     clock = pygame.time.Clock()
     running = True
 
-    output = Texture.from_size((640, 480), internal_format=ss.GL_RGBA)
-    depth = Texture.from_size((640, 480), internal_format=GL_DEPTH_COMPONENT)
+    output = Texture.from_size(size, internal_format=ss.GL_RGBA)
+    #depth = Texture.from_size((640, 480), internal_format=GL_DEPTH_COMPONENT)
+    depth = RenderBuffer.from_size(size, internal_format=GL_DEPTH_COMPONENT, multisampling=4)
 
     p = Program()
     fb = FrameBuffer()
@@ -140,7 +144,7 @@ def main():
     p.framebuffer = fb
     screen_fb = FrameBuffer.get_default()
 
-    p.debug = True
+    #p.debug = True
     p.options.DEPTH_TEST = True
     p.options.DepthMask = True
     p._target_d = depth

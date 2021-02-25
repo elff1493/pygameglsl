@@ -1,7 +1,7 @@
 from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import numpy as np
-from textures import Texture
+from textures import Texture, RenderBuffer
 
 
 class Vao: # todo, interleave mecanisem
@@ -93,7 +93,7 @@ class Vbo:
     def unpack_range(self):
         pass
 
-    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions:  int=None): # todo supportt interleaved data
+    def set_data(self, data: np.array, _type=GL_DYNAMIC_DRAW, dimensions: int=None): # todo supportt interleaved data
         size = data.nbytes
         s = data.shape
         self.len = s[0]
@@ -148,8 +148,11 @@ class FrameBuffer:
     def blit(self, other: "FrameBuffer",
              source_rect=None, dest_rect=None,
              mask=GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT, filter=GL_LINEAR):
+        if type(other) != FrameBuffer:
+            raise TypeError("other is not FrameBuffer")
         glBindFramebuffer(GL_READ_FRAMEBUFFER, other._id)
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._id)
+        #print(other._id, self._id)
         if not source_rect:
             source_rect = 0, 0, other.color.width, other.color.height
         if not dest_rect:
@@ -175,9 +178,17 @@ class FrameBuffer:
     @color.setter
     def color(self, tex):
         self._color = tex
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.tex, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+
+        if type(tex) is Texture:
+            glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.tex, 0)
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        elif type(tex) is RenderBuffer:
+            glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, tex._id)
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        else:
+            raise TypeError("type must be Texture like object")
 
     @property
     def depth(self):
@@ -186,9 +197,17 @@ class FrameBuffer:
     @depth.setter
     def depth(self, tex):
         self._depth = tex
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.tex, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+        if type(tex) is Texture:
+            glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.tex, 0)
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        elif type(tex) is RenderBuffer:
+            glBindFramebuffer(GL_FRAMEBUFFER, self._id)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, tex._id)
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        else:
+            raise TypeError("type must be Texture like object")
+
 
     @property
     def stencil(self):

@@ -1,6 +1,7 @@
 import pygame
 from pygame.locals import *
 from shader import Shader, fragment, Uniform, hw_flip, Texture, glGetString, GL_VERSION
+
 from glsl.v1_10 import sampler2D
 from glsl import v1_10 as g
 
@@ -68,4 +69,7 @@ def main():
         #screen.draw_top()
         pygame.display.flip()
     pygame.quit()
-main()
+
+
+if __name__ == "__main__":
+    main()

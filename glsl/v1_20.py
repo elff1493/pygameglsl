@@ -13,3 +13,15 @@ class mat4x2:...
 class mat4x3:...
 class mat4x4:...
 
+
+def transpose(matrix): # todo types
+    pass
+
+
+def matrixProduct():
+    pass
+
+
+def outerProduct():
+    pass
+

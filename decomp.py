@@ -550,25 +550,35 @@ class Recompiler:
 
     def _make_fragment(self):
         out = "#version " + str(self.version) + "\n"
+        varying = "varying "
+        if self.version > 120:
+            varying = "in "
         for i in self.fragment[2]:
             print(i, i.inout)
             if i.inout in ("auto", "in", "inout"):  # todo add check for later in out syintax
-                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+                out += varying + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
             elif i.inout in ("out",):
                 if self.version < 130: # todo is right?
                     out += "#define " + i.name + " gl_FragColor\n"
+                else:
+                    out += "out " + str(i.type.__name__) + " " + i.name + ";\n"
         out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.fragment[1]])
         out += "\n"
         out += "".join([(self.comp_func(i) + "\n") for i in self.fragment[3]])
         return out
 
     def _make_vertex(self):
+        varying = "varying "
+        attribute = "attribute "
+        if self.version > 120:
+            varying = "out "
+            attribute = "in "
         out = "#version " + str(self.version) + "\n"
         for t, n in self.vertex[4]:  # (type, name)
-            out += "attribute " + str(t.__name__) + " " + str(n) + ";\n"
+            out += attribute + str(t.__name__) + " " + str(n) + ";\n"
         for i in self.vertex[2]:
             if i.inout in ("auto", "out", "inout"):  # todo add check for later in out syintax
-                out += "varying " + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
+                out += varying + str(i.type.__name__) + " " + i.name + ";\n"  # todo add interpolatin
         out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.vertex[1]])
         out += "\n"
         out += "".join([(self.comp_func(i) + "\n") for i in self.vertex[3]])
@@ -581,7 +591,10 @@ class Recompiler:
 
         out = "#version " + str(self.version) + "\n"
         #out += "precision highp float;\n"
-        out += "varying vec2 fragCoord;\n"
+        if self.version <= 120:
+            out += "varying vec2 fragCoord;\n"
+        else:
+            out += "out vec2 fragCoord;\n"
         # out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in self.uniforms])
         # print(self.uniforms)
         func = "".join([i.glsl + "\n" for i in self.functions])
@@ -599,6 +612,14 @@ class Recompiler:
 
     def _make_tess_evaluation(self):
         out = "#version " + str(self.version) + "\n"
+        return out
+
+    def make_compute(self, compute):
+        out = "#version " + str(self.version) + "\n"
+        out += "\n".join(["uniform %s %s;" % (i[1].__name__, i[2]) for i in compute[1]])
+
+        func = "".join([i.glsl + "\n" for i in self.functions])
+        out += func
         return out
 
     def run(self):

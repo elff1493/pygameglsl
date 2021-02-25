@@ -2,9 +2,7 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import *
 import pygame
 import numpy
-import numpy as np
-import ctypes
-from typing import TypeVar, Generic, Union
+from typing import Union
 from decomp import Recompiler
 import glsl as _gl
 from glsl import v1_10 as _v1_10
@@ -24,13 +22,14 @@ import sys
 
 from gl_types import *
 from buffers import *
-from textures import Texture
+from textures import Texture, CubeMap
 
-NEAREST = GL_NEAREST
-LINEAR = GL_LINEAR
-GL_DEPTH_COMPONENT = GL_DEPTH_COMPONENT
-clear = glClear
-colorb = GL_COLOR_BUFFER_BIT
+from consts import Primitive
+#NEAREST = GL_NEAREST
+#LINEAR = GL_LINEAR
+#GL_DEPTH_COMPONENT = GL_DEPTH_COMPONENT
+#clear = glClear
+#colorb = GL_COLOR_BUFFER_BIT
 
 
 def vertex(f):
@@ -51,6 +50,8 @@ def fragment(f):
 _uniform_types_set = {
         Texture: glUniform1i,
         _gl.sampler2D: glUniform1i,
+        CubeMap: glUniform1i,
+        _gl.samplerCube: glUniform1i,
         float: glUniform1f,
         _gl.vec2: glUniform2f,
         _gl.vec3: lambda n, v :glUniform3f(n, v[0], v[1], v[2]),
@@ -75,20 +76,13 @@ _uniform_types_set = {
     }
 
 
-class ShaderCompute:
-    def __init__(self):
-        pass
-    @classmethod
-    def function(cls, f):
-        """decorator for glsl function"""
-        return GlslFuntion(f, "vertex")
 
-    def run(self):
-        pass
+
 
 class ShaderTessEvaluation:
     def __init__(self):
         self.program: Program = None
+
 
 class ShaderTessControl:
     def __init__(self):
@@ -102,6 +96,7 @@ class ShaderGeometry:
 
 
 class ShaderVertex:
+    gl_Position: _gl.vec4
     def __init__(self):
         #self.vao = vao
         self.program: Program = None
@@ -195,9 +190,9 @@ class Program:
     #    glClear(GL_DEPTH_BUFFER_BIT)
     #    glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def render_vao(self, vao: Vao, start=None, count=None, primitive=GL_TRIANGLES):
+    def render_vao(self, vao: Vao, start=None, count=None, primitive: Primitive = GL_TRIANGLES):
         """render the vao"""
-        #glEnableClientState(GL_VERTEX_ARRAY)
+        #glEnableClientState(GL_VERTEX_ARRAY) ?
 
         glViewport(*self._viewport)
         glUseProgram(self._id)
@@ -207,11 +202,11 @@ class Program:
         if count is None:  # assume size
             count = vao[0].len - start
         glBindVertexArray(vao._id)
-        glDrawArrays(primitive, start, count)  # todo indexing
+        glDrawArrays(primitive, start, count)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
-    def render_instance(self, vao: Vao, n: int,  start: int = 0, count=None, primitive=GL_TRIANGLES): # todo
+    def render_instance(self, vao: Vao, n: int,  start: int = 0, count=None, primitive: Primitive = GL_TRIANGLES): # todo
         glViewport(*self._viewport)
         glUseProgram(self._id)
         glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer._id)
@@ -219,11 +214,11 @@ class Program:
         if count is None:  # assume size
             count = vao[0].len - start
         glBindVertexArray(vao._id)
-        glDrawArraysInstanced(primitive, start, count, n)  # todo indexing
+        glDrawArraysInstanced(primitive, start, count, n)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
-    def render_vao_indexed(self, vao: Vao, ebo: Ebo, start: int = 0, count=None, primitive=GL_TRIANGLES):
+    def render_vao_indexed(self, vao: Vao, ebo: Ebo, start: int = 0, count=None, primitive: Primitive = GL_TRIANGLES):
         # todo add start
         glViewport(*self._viewport)
         glUseProgram(self._id)
@@ -233,28 +228,6 @@ class Program:
         glBindVertexArray(vao._id)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo._id)
         glDrawElements(primitive, ebo.len, ebo.type, None)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glUseProgram(0)
-
-    def render(self):
-        """render the shader on to the texture"""
-        glViewport(*self._viewport)
-        glUseProgram(self._id)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer._id)
-
-        glEnable(GL_TEXTURE_2D)
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 0)
-        glVertex2f(-1, 1)
-        glTexCoord2f(0, 1)
-        glVertex2f(-1, -1)
-        glTexCoord2f(1, 1)
-        glVertex2f(1, -1)
-        glTexCoord2f(1, 0)
-        glVertex2f(1, 1)
-        glEnd()
-        glDisable(GL_TEXTURE_2D)
-
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
@@ -319,7 +292,7 @@ class Program:
             temp = self.vertex._get_data()
             compiler.vertex = ((None,), u, temp[0], temp[1], a)
 
-        if self.geometry is not None: #todo implemen
+        if self.geometry is not None: #todo implement
             raise Exception("not supported yet")
 
         if self.tess_control is not None:
@@ -385,27 +358,6 @@ class Program:
             t = self.framebuffer.depth
         self._viewport = 0, 0, t.width, t.height
 
-        #self._fb = glGenFramebuffers(1)
-        #glBindFramebuffer(GL_FRAMEBUFFER, self._fb)
-        #glBindTexture(GL_TEXTURE_2D, self._.tex)
-
-        #if self._target_s:
-         #   self._viewport = 0, 0, self._target_s.width, self._target_s.height
-          #  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, self._target_c.tex, 0)
-
-        #if self._target_d:
-         #   self._viewport = 0, 0, self._target_d.width, self._target_d.height
-         #   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self._target_d.tex, 0)
-
-        #if self._target_c:
-         #   self._viewport = 0, 0, self._target_c.width, self._target_c.height
-          #  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._target_c.tex, 0)
-
-        #if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
-         #   t = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-          #  raise Exception("frame buffer error - incomplete " + str(t))
-
-        #glBindFramebuffer(GL_FRAMEBUFFER, 0)
     def set_viewport(self, v):
         self._viewport = v
 
@@ -413,13 +365,15 @@ class Program:
         uset = _uniform_types_set[_type]
         uname = glGetUniformLocation(self._id, name)
         p = self._id
-        if _type in (_gl.sampler2D, Texture):
+        debug = self.debug
+        if _type in (_gl.sampler2D, Texture, CubeMap, _gl.samplerCube):
             def set_from_texture(self, value):
                 glUseProgram(p)
-                if type(value) is Texture:
+                if type(value) in (Texture, CubeMap):
                     if value._active_index is None:
                         raise ValueError("Texture is not active, can not set uniform")
-                    print("set as", value._active_index)
+                    if debug:
+                        print("texture uiform set as", value._active_index)
                     uset(uname, value._active_index)
                 elif type(value) is int:
                     uset(uname, value)
@@ -436,8 +390,52 @@ class Program:
             return Exception("this getter is not suppoted")
 
         return property(fset=set_uniform, fget=get_uniform)
+
 # todo test multipul shaders
 
+class ShaderCompute:
+    """
+    in uvec3 gl_NumWorkGroups;
+in uvec3 gl_WorkGroupID;
+in uvec3 gl_LocalInvocationID;
+in uvec3 gl_GlobalInvocationID;
+in uint  gl_LocalInvocationIndex;
+    """
+    #in
+    gl_NumWorkGroups: _gl.vec3
+    gl_WorkGroupID: _gl.vec3
+    gl_LocalInvocationID: _gl.vec3
+    gl_GlobalInvocationID: _gl.vec3
+    gl_LocalInvocationIndex: int
+
+    #const
+    #const uvec3 gl_WorkGroupSize;
+
+    gl_WorkGroupSize: _gl.vec3
+    def __init__(self):
+        self._p = glCreateProgram()
+        self._id = glCreateShader(GL_COMPUTE_SHADER)
+        self.version = 120
+        self.debug = False
+
+    @classmethod
+    def function(cls, f):
+        """decorator for glsl function"""
+        return GlslFuntion(f, "vertex")
+
+    def compile(self):
+        glShaderSource(self._id, 2, csSrc, NULL)
+        glCompileShader(self._id)
+
+        glAttachShader(self._p, self._id)
+
+        compiler = Recompiler([])
+        compiler.version = self.version
+        compiler.debug = self.debug
+        compiler.import_as = to_remove
+
+    def run(self, x=1, y=1, z=1):
+        pass
 
 class Options:
     def __init__(self):
